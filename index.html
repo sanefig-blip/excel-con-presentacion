@@ -1,0 +1,1624 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Registro de Intervenciones de Bomberos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://unpkg.com/jspdf-autotable@3.5.28/dist/jspdf.plugin.autotable.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.bundle.js"></script>
+    <style>
+        /* Agrega un estilo para los scrollbars para que se vean mejor en temas oscuros */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937; /* bg-gray-800 */
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563; /* bg-gray-600 */
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; /* bg-gray-500 */
+        }
+        /* Estilo para selectores múltiples */
+        select[multiple] {
+            height: 100px;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100">
+    <div class="flex flex-col min-h-screen">
+        <main id="app-container" class="flex-grow py-4 sm:py-6 lg:py-8 px-2 sm:px-4 lg:px-6">
+            <!-- El contenido de la aplicación se renderizará aquí -->
+        </main>
+        <footer id="footer-container" class="bg-gray-900 border-t border-gray-700 px-4">
+            <!-- La navegación del pie de página se renderizará aquí -->
+        </footer>
+    </div>
+    <div id="modal-container"></div>
+    <script>
+        // =================================================================================
+        // ICONOS (SVG como cadenas de texto)
+        // =================================================================================
+        const ICONS = {
+            plus: '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>',
+            minus: '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4" /></svg>',
+            edit: (className = "w-5 h-5") => `<svg xmlns="http://www.w3.org/2000/svg" class="${className}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>`,
+            delete: '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>',
+            download: '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>',
+            upload: '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>',
+            table: '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 14h18M3 6h18M3 18h18" /></svg>',
+            settings: '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.096 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>',
+            stats: '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>',
+            drillDown: '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /><path fill-rule="evenodd" d="M8 10a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" /></svg>',
+            presentation: '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V7a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>',
+        };
+        
+        // Register Chart.js plugins globally
+        Chart.register(ChartDataLabels);
+
+        // =================================================================================
+        // DATOS INICIALES POR DEFECTO
+        // =================================================================================
+        const initialEditableLists = {
+            estaciones: [
+                'ESTACION 1 "PUERTO MADERO"', 'ESTACION 2 "PATRICIOS"', 'ESTACION 3 "BARRACAS"', 'ESTACION 4 "RECOLETA"',
+                'ESTACION 5 "CMTE. GRAL. ARIEL GASTON VAZQUEZ"', 'ESTACION 6 "CRIO. MY. MC. FIRMAPAZ"', 'ESTACION 7 "FLORES"',
+                'ESTACION 8 "NUEVA CHICAGO"', 'ESTACION 9 "VERSAILLES"', 'ESTACION 10 "LUGANO"', 'ESTACION 11 "ALBARIÑO"',
+                'DESTACAMENTO "POMPEYA"', 'DESTACamento "BOCA"', 'DESTACAMENTO "MISERERE"', 'DESTACAMENTO "RETIRO"',
+                'DESTACAMENTO "URQUIZA"', 'DESTACAMENTO "SAAVEDRA"', 'DESTACAMENTO "PALERMO"', 'DESTACAMENTO CHACARITA',
+                'DESTACAMENTO VELEZ', 'DESTACAMENTO DEVOTO', 'DESTACAMENTO GER CABALLITO', 'DESTACAMENTO GER SAAAVEDRA',
+            ],
+            hechosTipos: [
+                "EXTRACCION DE CADAVER", "INCENDIO CHICO", "LABORES ESPECIFICAS", "INVESTIGACION PERICIAL",
+                "SUMINISTRO DE AGUA", "SALVAMENTO DE PERSONA", "PEDIDO DE ESTABLECER MEDIDAS DE SEGURIDAD",
+                "SIN EFECTO", "-///-", "COLABORACION CON PERSONAL POLICIAL", "ESTABLECER MEDIDAS DE SEGURIDAD",
+                "ALARMA DE INCENDIO", "INERTIZACION DE COMBUSTIBLE", "PRINCIPIO DE INCENDIO", "MEDICIONES",
+                "PEDIDO DE SALVAMENTO DE PERSONA", "PEDIDO DE SALVAMENTO DE ANIMAL", "SALVAMENTO DE ANIMAL",
+                "ESCAPE DE GAS", "COLABORACION CON AMBULANCIA DEL SAME", "PEDIDO DE ESCAPE DE GAS",
+                "INCENDIO GRANDE", "INCENDIO MEDIANO", "INCENDIO"
+            ],
+            usos: [
+                "ACCIDENTE DE TRABAJO", "AEROPARQUE", "ARBOL VIA PUBLICA", "ASTILLERO", "AUTODROMO", "BAÑO QUIMICO",
+                "BARRIO DE EMERGENCIA", "BUZON DE DISTRIBUCION ELECTRICA", "CABLEADO AEREO", "CABLEADO SUBTERRANEO",
+                "CAIDO DE ALTURA", "CAJA DE SEMAFORO", "CAJA ESQUINERA", "CAMARA SUBTERRANEA", "CANAL DE TELEVISION",
+                "CARROCERIA VIA PUBLICA", "CARTEL VIA PUBLICA", "CASA DE DEPARTAMENTOS", "CASA DE FAMILIA",
+                "CASA DE INQUILINATO", "CASA DE OFICINAS", "CASA DE OFICINAS HASTA 3° PISO", "CASA DE OFICinas PLANOS ELEVADOS",
+                "CASA TIPO PH", "CASILLA", "CEMENTERIO", "CENTROS DE COMPUTOS", "CINES/TEATROS/CENTROS CULTURALES",
+                "CLUB DEPORTIVO", "COLUMNA DE ALUMBRADO", "COMEDOR COMUNITARIO", "COMPLEJO PENITENCIARIO", "CONSULTORIO",
+                "CONTENEDOR DE RESIDUOS VIA PUBLICA", "DEPARTAMENTOS HASTA 3°PISO", "DEPOSITO", "EDIFICACION EN DESUSO",
+                "EDIFICIO PUBLICO", "EL PALOMAR", "EMBARCACION", "EN AGUAS", "EN DEMANDA DE AUXILIO", "ESTABLECIMIENTO BANCARIO",
+                "ESTABLECIMIENTO DEPORTIVO", "ESTABLECIMIENTO EDUCATIVO", "ESTABLECIMIENTO RELIGioso",
+                "ESTABLECIMIENTO SANITARIO", "ESTacion DE BOMBEROS", "ESTACION DE SERVICIO", "ESTACION DE SUBTES",
+                "ESTACION FERROVIARIA", "ESTUDIO DE RADIO/GRABACION", "EZEIZA", "FABRICA/INDUSTRIAS",
+                "FORMACION FERROVIARIA A NIVEL/VIAS", "FORMACION FERROVIaria BAJO NIVEL/VIAS", "FORMACION SUBTERRANEA/VIAS",
+                "FUMIGACIONES", "GABINETE DE GAS", "GABINETE ELECTRICO", "GALERIA COMERCIAL", "GALPON", "GARAGE A NIVEL",
+                "GARAGE BAJO NIVEL", "GARITA DE SEGURIDAD", "GENERADOR ELECTRICO", "GERIATRICOS", "HIPERMERCADO/SHOPPING",
+                "HIPODROMO", "HOGAR DE MENORES", "HOTEL", "LABORATORIO", "LOCAL BAILABLE", "LOCAL GASTRONOMICO", "MAQUINARIAS",
+                "MARQUESINAS", "MOTOVEHICULO VIA PUBLICA", "NEGOCIOS", "OBRADOR", "OBRAS EN CONSTRUCCION", "OTROS",
+                "PASTOS/PASTIZALES", "PERSONA QUE NO RESPONDE", "PLANOS ELEVADOS", "PLANTA RECICLADORA",
+                "PLAYA DE ESTACIONAMIENTO", "PLAYA JUDICIAL", "PLAZAS/PARQUES/PASEOS", "POR COLISION DE FORMACION FERROVIARIA",
+                "POR COLISION DE FORMACION SUBTERRNEA", "POR COLISION DE VEHICULOS", "POSTE", "PREDIO",
+                "PUENTE PEATONAL/VEHICULAR", "PUESTO AMBULANTE", "RESERVA ECOLOGICA", "RESIDUOS INTERIOR",
+                "RESIDUOS VIA PUBLICA", "SAN FERNANDO", "SERVICIO/INTEGRAR FUERZAS", "SUBESTACION ELECTRICA", "SUBSUELO",
+                "SUPERMERCADO", "TABLERO ELECTRICO", "TALLER", "TERMINAL DE OMNIBUS", "TERRENO CERCADO O BALDIO",
+                "TOMA DOMICILIARIA", "TRANSPORTE ESCOLAR", "TRANSPORTE PUBLICO DE PASAJEROS", "VEHICULO DE ALQUILER",
+                "VEHICULO DE CARGA VIA PUBLICA", "VEHICULO DE COMPETICION", "VEHICULO OTROS",
+                "VEHICULO PARTICULAR INTERIOR GARAGE", "VEHICULO PARTICULAR VIA PUBLICA", "VEHICULO POLICIAL", "VIA PUBLICA",
+                "VIAS FFCC", "VIAS SUBTERRANEO", "VOLQUETE VIA PUBLICA", "DEPENDENCIA POLICIAL", "EMBAJADA",
+            ],
+            causas: [
+                "-///-", "200 CONTINGENCIA ELECTRICA", "201 ELEMENTO DE PIROTECNIA", "202 COLILLA/ELEMENTO DE FUMADOR",
+                "203 CALENTAMIENTO ESPONTANEO/AUTOCOMBUSTION", "204 DESPRENDIMIENTO DE CHISPAS",
+                "205 EXCESIVA EXPOSICION CALORICA DE ALIMENTOS", "206 LLAMA LIBRE (FOSFORO/ENCENDEDOR O SIMILAR)",
+                "207 FUEGO/RESCOLDO EN ZONA DE VAGABUNDEO", "208 FUEGO SIN ATENCION", "209 INCINERACION DE RESIDUOS",
+                "210 LLAMA LIBRE DE ARTEFACTO A GAS", "211 LLAMA LIBRE DE VELA", "212 RADIACION CALORICA",
+                "213 SE INVESTIGAN", "214 IGNICION DE GASES/VAPORES INFLAMABLES O COMBUSTIBLES",
+                "215 FUEGO/RESCOLDO EN ZONA DE CAMPAMENTO", "216 ROCE DE PARTES METALICAS CON PAVIMENTO/POR COLISION",
+                "217 IGNICION DE GASES/VAPORES CON LLAMA LIBRE", "218 FUGA EN SISTEMA DE GNC",
+                "219 IGNICION DE FUGA GNC/HC CON SISTEMA DE ENCENDIDO", "220 ASPERJAMIENTO DE SUSTANCIA ACELERANTE DE LA COMBUSTION",
+                "221 IGNICION DE MEMBRANA ASFALTICA", "222 BOLLOS DE PAPEL", "223 FUEGO EN ZONA DE MANIFESTANTES",
+                "224 CHISPAS DE CARBON EN CONTACTO CON GRASAS", "225 RECALENTAMIENTO DE BOBINADO", "226 EN ESTUDIO",
+                "227 OTROS", "227 OTROS (BRASAS)", "227 OTROS (CHISPAS SOLDADORA/OXICORTE)", "227 OTROS (CONDUCCION)",
+                "227 OTROS (FUMIGACION)", "227 OTROS (TRANSEUNTES)", "227 OTROS (GAS EVADIDO)",
+                "227 OTROS (GRASAS ADHERIDAS)", "227 OTROS (IGNICION DE ACEITE)", "227 OTROS (IGNICION DE GRASAS)",
+                "228 FUEGO PROVOCADO POR MANIFESTANTES", "229 CORTE SUMINISTRO", "230 FALLA SISTEMA", "231 SOBRECARGA CABINA",
+                "A/C BEFER", "A/C OIIE",
+            ],
+        };
+        const initialHeaderData = {
+            novedades: 'NOVEDADES DEL 30 AL 31 DE JULIO DEL 2025 DE 07:00 HS A 07:00 HS',
+            jefeInspecciones: { rank: 'COMANDANTE DIRECTOR', name: 'D. CORIA .' },
+            jefeServicio: { rank: 'COMANDANTE', name: 'M. LEDESMA.' },
+            jefeGuardia: { rank: 'SUBCOMANDANTE', name: 'M. FAZIO .' },
+            jefeReserva: { rank: 'SUBCOMANDANTE', name: 'D. CHIERICHETTI.' },
+            oficialServicio1: { rank: 'PRINCIPAL', name: 'VITALLI F.' },
+            oficialGuardia1: { rank: 'OF. MAYOR', name: 'MACIEL, C.' },
+            oficialServicio2: { rank: 'TENIENTE', name: 'MALISZ N.' },
+            oficialGuardia2: { rank: 'BRO. SUP.', name: 'RIVEROS C.' },
+            confecciono1: { time: '07 a 19 Hs', rank: 'Bombero Superior', name: 'SUBTTE MACIEL' },
+            confecciono2: { time: '19 a 07 Hs', rank: 'Bombero Superior', name: 'OZUNA F' },
+        };
+        const initialInterventions = [
+            {
+                id: 'a1b2c3d4-e5f6-7890-1234-567890abcdef',
+                interv: 'REF', dia: '29', mes: '7', ano: '2025', nCarta: '1505779', estacion: 'TRANSPORTE FORENSE',
+                hechoTipo: 'EXTRACCION DE CADAVER', uso: 'CASA DE FAMILIA', plantaPiso: '', despacho: '13:05',
+                presente: '00:00', regreso: '10:55', calle: 'SALTA',
+                altura: '1996', causas: '-///-', cria: '1C', juzg: 'SI', vm: 0, vf: 0, fm: 0, ff: 1,
+            },
+            {
+                id: 'b2c3d4e5-f6a7-8901-2345-67890abcdef1',
+                interv: 'REF', dia: '30', mes: '7', ano: '2025', nCarta: '1506058', estacion: 'ESTACION 3 "BARRACAS"',
+                hechoTipo: 'INCENDIO', uso: 'CONSULTORIO', plantaPiso: '', despacho: '05:53',
+                presente: '06:10', regreso: '00:11', calle: 'OSVALDO LA CRUZ',
+                altura: 'SAN ANTONIO', causas: 'C4', cria: 'C4', juzg: 'NO',
+                vm: 0, vf: 0, fm: 0, ff: 0,
+            },
+            {
+                id: 'c3d4e5f6-a7b8-9012-3456-7890abcdef12',
+                interv: 'SI', dia: '30', mes: '7', ano: '2025', nCarta: '1506097', estacion: 'DESTACAMENTO GER CABALLITO',
+                hechoTipo: 'INVESTIGACION PERICIAL', uso: 'CASA DE DEPARTAMENTOS', plantaPiso: 'PB', despacho: '09:26',
+                presente: '09:33', regreso: '00:07', calle: 'SENILLOSA',
+                altura: '1755', causas: '-///-', cria: 'C11', juzg: 'NO', vm: 0, vf: 0, fm: 0, ff: 0,
+            },
+        ];
+
+        // =================================================================================
+        // GESTIÓN DEL ESTADO Y LOCALSTORAGE
+        // =================================================================================
+        const getFromStorage = (key, defaultValue) => {
+            const item = localStorage.getItem(key);
+            try {
+                return item ? JSON.parse(item) : defaultValue;
+            } catch (e) {
+                console.error(`Error parsing JSON from localStorage key "${key}":`, e);
+                return defaultValue;
+            }
+        };
+        const saveToStorage = (key, value) => {
+            localStorage.setItem(key, JSON.stringify(value));
+        };
+        
+        const initialDashboardFilters = {
+            startDate: '',
+            endDate: '',
+            estaciones: [],
+            hechosTipos: [],
+            usos: [],
+        };
+
+        let state = {
+            interventions: getFromStorage('interventions', initialInterventions),
+            editableLists: getFromStorage('editableLists', initialEditableLists),
+            headerData: getFromStorage('headerData', initialHeaderData),
+            zoomLevel: getFromStorage('zoomLevel', 100),
+            dashboardFilters: getFromStorage('dashboardFilters', initialDashboardFilters),
+        };
+
+        function setState(newState) {
+            const oldState = { ...state };
+            state = { ...state, ...newState };
+
+            if (JSON.stringify(oldState.interventions) !== JSON.stringify(state.interventions)) {
+                saveToStorage('interventions', state.interventions);
+            }
+            if (JSON.stringify(oldState.editableLists) !== JSON.stringify(state.editableLists)) {
+                saveToStorage('editableLists', state.editableLists);
+            }
+            if (JSON.stringify(oldState.headerData) !== JSON.stringify(state.headerData)) {
+                saveToStorage('headerData', state.headerData);
+            }
+            if (oldState.zoomLevel !== state.zoomLevel) {
+                saveToStorage('zoomLevel', state.zoomLevel);
+                applyZoom();
+            }
+            if (JSON.stringify(oldState.dashboardFilters) !== JSON.stringify(state.dashboardFilters)) {
+                saveToStorage('dashboardFilters', state.dashboardFilters);
+            }
+
+            handleNavigation();
+        }
+
+        // =================================================================================
+        // HELPERS
+        // =================================================================================
+        function applyZoom() {
+            document.documentElement.style.zoom = `${state.zoomLevel}%`;
+        }
+
+        const calculateTimeDiff = (startTime, endTime) => {
+            if (!startTime || !endTime) return '--:--';
+            try {
+                const [startH, startM] = startTime.split(':').map(Number);
+                const [endH, endM] = endTime.split(':').map(Number);
+
+                if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) return '--:--';
+
+                let startDate = new Date(2000, 0, 1, startH, startM);
+                let endDate = new Date(2000, 0, 1, endH, endM);
+
+                if (endDate < startDate) {
+                    endDate.setDate(endDate.getDate() + 1);
+                }
+
+                const diffMs = endDate.getTime() - startDate.getTime();
+                if (isNaN(diffMs) || diffMs < 0) return '--:--';
+                
+                if (diffMs === 0) return '00:00';
+
+                const diffH = Math.floor(diffMs / (1000 * 60 * 60));
+                const diffM = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+                return `${String(diffH).padStart(2, '0')}:${String(diffM).padStart(2, '0')}`;
+            } catch (e) {
+                return '--:--';
+            }
+        };
+
+        const sanitizeHTML = (str) => {
+            if(str === null || str === undefined) return '';
+            const temp = document.createElement('div');
+            temp.textContent = str;
+            return temp.innerHTML;
+        };
+        
+        const timeStringToMinutes = (timeStr) => {
+            if (!timeStr || timeStr === '--:--') return null;
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            if (isNaN(hours) || isNaN(minutes)) return null;
+            return hours * 60 + minutes;
+        };
+
+        const minutesToTimeString = (totalMinutes) => {
+            if (totalMinutes === null || isNaN(totalMinutes)) return '--:--';
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = Math.round(totalMinutes % 60);
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+        };
+        
+        const countBy = (key, data) => data.reduce((acc, i) => {
+            const value = i[key] || 'No especificado';
+            acc[value] = (acc[value] || 0) + 1;
+            return acc;
+        }, {});
+
+        // =================================================================================
+        // ELEMENTOS DEL DOM
+        // =================================================================================
+        const appContainer = document.getElementById('app-container');
+        const footerContainer = document.getElementById('footer-container');
+        const modalContainer = document.getElementById('modal-container');
+
+        // =================================================================================
+        // LÓGICA DE RENDERIZADO
+        // =================================================================================
+
+        function renderFooter() {
+            const hash = window.location.hash || '#/';
+            const isHome = hash === '#/' || hash === '#';
+            const isStats = hash.startsWith('#/statistics');
+            const isSettings = hash === '#/settings';
+
+            const navLink = (href, icon, text, isActive) => `
+                <a href="${href}" class="flex items-center space-x-2 px-4 py-2 border-t-2 border-r-2 border-gray-600 rounded-t-lg text-sm font-medium transition-colors duration-200 ${isActive ? 'bg-gray-800 border-blue-500 text-white' : 'bg-gray-900 text-gray-400 hover:bg-gray-700 hover:text-white'}">
+                    ${icon}
+                    <span>${text}</span>
+                </a>
+            `;
+
+            footerContainer.innerHTML = `
+                <div class="flex justify-between items-center h-full py-1">
+                    <nav class="flex items-end space-x-1 pt-1">
+                        ${navLink('#/', ICONS.table, 'Hoja1: Intervenciones', isHome)}
+                        ${navLink('#/statistics', ICONS.stats, 'Dashboard de Análisis', isStats)}
+                        ${navLink('#/settings', ICONS.settings, 'Hoja3: Editar Desplegables', isSettings)}
+                    </nav>
+                    <div id="zoom-control" class="flex items-center space-x-3 text-sm font-medium text-gray-400">
+                        <button id="zoom-out-btn" class="p-1 rounded-full hover:bg-gray-700 transition-colors" aria-label="Reducir zoom">${ICONS.minus}</button>
+                        <button id="zoom-reset-btn" class="w-12 text-center tabular-nums cursor-pointer hover:text-white" aria-label="Restaurar zoom">${state.zoomLevel}%</button>
+                        <button id="zoom-in-btn" class="p-1 rounded-full hover:bg-gray-700 transition-colors" aria-label="Aumentar zoom">${ICONS.plus}</button>
+                    </div>
+                </div>
+            `;
+            attachFooterListeners();
+        }
+
+        // --- Renderizado de Modales ---
+
+        function renderModal(title, content, formId, maxWidth = 'max-w-4xl') {
+            modalContainer.innerHTML = `
+                <div id="modal-backdrop" class="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
+                    <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-full ${maxWidth} max-h-[95vh] flex flex-col">
+                        <h2 class="text-2xl font-bold mb-6 text-white">${title}</h2>
+                        <div class="flex-grow overflow-y-auto pr-2">
+                            ${formId ? `<form id="${formId}" class="space-y-6">${content}</form>` : content}
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('modal-backdrop').addEventListener('click', (e) => {
+                if (e.target.id === 'modal-backdrop') {
+                    closeModal();
+                }
+            });
+        }
+
+        function closeModal() {
+            modalContainer.innerHTML = '';
+        }
+
+        function renderInterventionForm(interventionId = null) {
+            const isEditing = interventionId !== null;
+            const today = new Date();
+            const initialData = isEditing
+                ? state.interventions.find(i => i.id === interventionId)
+                : {
+                    interv: 'REF', dia: String(today.getDate()), mes: String(today.getMonth() + 1), ano: String(today.getFullYear()),
+                    nCarta: '', estacion: '', hechoTipo: '', uso: '', plantaPiso: '', despacho: '', presente: '', regreso: '',
+                    calle: '', altura: '', causas: '', cria: '', juzg: 'NO', vm: 0, vf: 0, fm: 0, ff: 0,
+                };
+
+            const sortedLists = {
+                estaciones: [...state.editableLists.estaciones].sort(),
+                hechosTipos: [...state.editableLists.hechosTipos].sort(),
+                usos: [...state.editableLists.usos].sort(),
+                causas: [...state.editableLists.causas].sort(),
+            };
+            const uniqueCalles = [...new Set(state.interventions.map(i => i.calle).filter(Boolean))];
+
+            const option = (val, text, selectedVal) => `<option value="${sanitizeHTML(val)}" ${val === selectedVal ? 'selected' : ''}>${sanitizeHTML(text)}</option>`;
+
+            const content = `
+                <!-- Filas de inputs -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div><label class="block text-sm font-medium text-gray-300">Interv</label><input type="text" name="interv" value="${sanitizeHTML(initialData.interv)}" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2" /></div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div><label class="block text-sm font-medium text-gray-300">Día</label><input type="number" name="dia" value="${sanitizeHTML(initialData.dia)}" required class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2" /></div>
+                        <div><label class="block text-sm font-medium text-gray-300">Mes</label><input type="number" name="mes" value="${sanitizeHTML(initialData.mes)}" required class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2" /></div>
+                        <div><label class="block text-sm font-medium text-gray-300">Año</label><input type="number" name="ano" value="${sanitizeHTML(initialData.ano)}" required class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2" /></div>
+                    </div>
+                    <div><label class="block text-sm font-medium text-gray-300">N° Carta</label><input type="text" name="nCarta" value="${sanitizeHTML(initialData.nCarta)}" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2" /></div>
+                    <div><label class="block text-sm font-medium text-gray-300">Estación</label><select name="estacion" required class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2">${option('', 'Seleccionar...', initialData.estacion)}${sortedLists.estaciones.map(val => option(val, val, initialData.estacion)).join('')}</select></div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div><label class="block text-sm font-medium text-gray-300">Hecho/Tipo</label><select name="hechoTipo" required class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2">${option('', 'Seleccionar...', initialData.hechoTipo)}${sortedLists.hechosTipos.map(val => option(val, val, initialData.hechoTipo)).join('')}</select></div>
+                    <div><label class="block text-sm font-medium text-gray-300">Uso</label><select name="uso" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2">${option('', 'Seleccionar...', initialData.uso)}${sortedLists.usos.map(val => option(val, val, initialData.uso)).join('')}</select></div>
+                    <div><label class="block text-sm font-medium text-gray-300">Planta/Piso</label><input type="text" name="plantaPiso" value="${sanitizeHTML(initialData.plantaPiso)}" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2" /></div>
+                    <div><label class="block text-sm font-medium text-gray-300">Causas</label><select name="causas" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2">${option('', 'Seleccionar...', initialData.causas)}${sortedLists.causas.map(val => option(val, val, initialData.causas)).join('')}</select></div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div><label class="block text-sm font-medium text-gray-300">Calle</label><input type="text" name="calle" value="${sanitizeHTML(initialData.calle)}" list="calles-list" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2" /><datalist id="calles-list">${uniqueCalles.map(val => `<option value="${sanitizeHTML(val)}"></option>`).join('')}</datalist></div>
+                    <div><label class="block text-sm font-medium text-gray-300">Altura / Inters.</label><input type="text" name="altura" value="${sanitizeHTML(initialData.altura)}" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2" /></div>
+                </div>
+                <div class="grid grid-cols-3 gap-4">
+                    <div><label class="block text-sm font-medium text-gray-300">Despacho</label><input type="time" name="despacho" value="${sanitizeHTML(initialData.despacho)}" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2" /></div>
+                    <div><label class="block text-sm font-medium text-gray-300">Presente</label><input type="time" name="presente" value="${sanitizeHTML(initialData.presente)}" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2" /></div>
+                    <div><label class="block text-sm font-medium text-gray-300">Regreso</label><input type="time" name="regreso" value="${sanitizeHTML(initialData.regreso)}" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2" /></div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+                    <div><label class="block text-sm font-medium text-gray-300">Cria</label><input type="text" name="cria" value="${sanitizeHTML(initialData.cria)}" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2" /></div>
+                    <div><label class="block text-sm font-medium text-gray-300">Juzg</label><select name="juzg" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2">${option('NO', 'NO', initialData.juzg)}${option('SI', 'SI', initialData.juzg)}</select></div>
+                    <div><label class="block text-sm font-medium text-gray-300">VM</label><input type="number" name="vm" value="${initialData.vm}" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2" /></div>
+                    <div><label class="block text-sm font-medium text-gray-300">VF</label><input type="number" name="vf" value="${initialData.vf}" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2" /></div>
+                    <div><label class="block text-sm font-medium text-ray-300">FM</label><input type="number" name="fm" value="${initialData.fm}" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2" /></div>
+                    <div><label class="block text-sm font-medium text-gray-300">FF</label><input type="number" name="ff" value="${initialData.ff}" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2" /></div>
+                </div>
+                <div class="pt-4 flex justify-end space-x-3">
+                    <button type="button" id="cancel-btn" class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-500">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500">${isEditing ? 'Guardar Cambios' : 'Agregar'}</button>
+                </div>
+            `;
+
+            renderModal(isEditing ? 'Editar Intervención' : 'Nueva Intervención', content, 'intervention-form');
+
+            document.getElementById('cancel-btn').addEventListener('click', closeModal);
+            document.getElementById('intervention-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData.entries());
+                const numberFields = ['vm', 'vf', 'fm', 'ff'];
+                numberFields.forEach(field => { data[field] = parseInt(data[field]) || 0; });
+                
+                if (isEditing) {
+                    const updatedIntervention = { ...data, id: interventionId };
+                    const interventions = state.interventions.map(item => item.id === interventionId ? updatedIntervention : item);
+                    setState({ interventions });
+                } else {
+                    const newIntervention = { ...data, id: crypto.randomUUID() };
+                    const interventions = [...state.interventions, newIntervention];
+                    setState({ interventions });
+                }
+                closeModal();
+            });
+        }
+        
+        function renderHeaderForm() {
+            const { headerData } = state;
+
+            const officerInput = (id, label, officer) => `
+                <div>
+                    <label class="block text-sm font-medium text-gray-300">${label}</label>
+                    <div class="flex gap-2 mt-1">
+                        <input type="text" name="${id}-rank" placeholder="Rango" value="${sanitizeHTML(officer.rank)}" class="block w-1/2 bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2" />
+                        <input type="text" name="${id}-name" placeholder="Nombre" value="${sanitizeHTML(officer.name)}" class="block w-1/2 bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2" />
+                    </div>
+                </div>
+            `;
+            
+            const confeccionoInput = (id, label, data) => `
+                <div>
+                    <label class="block text-sm font-medium text-gray-300">${label}</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1">
+                        <input type="text" name="${id}-time" placeholder="Turno" value="${sanitizeHTML(data.time)}" class="block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2" />
+                        <input type="text" name="${id}-rank" placeholder="Jerarquía" value="${sanitizeHTML(data.rank)}" class="block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2" />
+                        <input type="text" name="${id}-name" placeholder="Nombre" value="${sanitizeHTML(data.name)}" class="block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2" />
+                    </div>
+                </div>
+            `;
+
+            const textInput = (id, label, value) => `
+                <div>
+                    <label for="${id}" class="block text-sm font-medium text-gray-300">${label}</label>
+                    <input type="text" id="${id}" name="${id}" value="${sanitizeHTML(value)}" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white p-2" />
+                </div>
+            `;
+
+            const content = `
+                ${textInput('novedades', 'Novedades', headerData.novedades)}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                    <fieldset class="border border-gray-600 p-4 rounded-lg space-y-4">
+                        <legend class="px-2 font-semibold text-gray-300">Jefes</legend>
+                        ${officerInput('jefeInspecciones', 'Jefe de Inspecciones', headerData.jefeInspecciones)}
+                        ${officerInput('jefeServicio', 'Jefe de Servicio', headerData.jefeServicio)}
+                        ${officerInput('jefeGuardia', 'Jefe de Guardia', headerData.jefeGuardia)}
+                        ${officerInput('jefeReserva', 'Jefe de Reserva', headerData.jefeReserva)}
+                    </fieldset>
+                    <fieldset class="border border-gray-600 p-4 rounded-lg space-y-4">
+                         <legend class="px-2 font-semibold text-gray-300">Oficiales</legend>
+                         ${officerInput('oficialServicio1', 'Oficial de Serv. 08-20hs (Principal)', headerData.oficialServicio1)}
+                         ${officerInput('oficialGuardia1', 'Oficial de Guar. 08-20hs (Of. Mayor)', headerData.oficialGuardia1)}
+                         ${officerInput('oficialServicio2', 'Oficial de Serv. 20-08hs (Teniente)', headerData.oficialServicio2)}
+                         ${officerInput('oficialGuardia2', 'Oficial de Guar. 20-08hs (Bro. Sup.)', headerData.oficialGuardia2)}
+                    </fieldset>
+                </div>
+                 <fieldset class="border border-gray-600 p-4 rounded-lg space-y-4">
+                    <legend class="px-2 font-semibold text-gray-300">Otros Campos de Encabezado</legend>
+                    ${confeccionoInput('confecciono1', 'Confeccionó (Turno 1)', headerData.confecciono1)}
+                    ${confeccionoInput('confecciono2', 'Confeccionó (Turno 2)', headerData.confecciono2)}
+                </fieldset>
+                <div class="pt-4 flex justify-end space-x-3">
+                    <button type="button" id="cancel-btn" class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-500">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500">Guardar Cambios</button>
+                </div>
+            `;
+
+            renderModal('Editar Encabezado', content, 'header-form');
+
+            document.getElementById('cancel-btn').addEventListener('click', closeModal);
+            document.getElementById('header-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const newHeaderData = {
+                    novedades: formData.get('novedades'),
+                    jefeInspecciones: { rank: formData.get('jefeInspecciones-rank'), name: formData.get('jefeInspecciones-name') },
+                    jefeServicio: { rank: formData.get('jefeServicio-rank'), name: formData.get('jefeServicio-name') },
+                    jefeGuardia: { rank: formData.get('jefeGuardia-rank'), name: formData.get('jefeGuardia-name') },
+                    jefeReserva: { rank: formData.get('jefeReserva-rank'), name: formData.get('jefeReserva-name') },
+                    oficialServicio1: { rank: formData.get('oficialServicio1-rank'), name: formData.get('oficialServicio1-name') },
+                    oficialGuardia1: { rank: formData.get('oficialGuardia1-rank'), name: formData.get('oficialGuardia1-name') },
+                    oficialServicio2: { rank: formData.get('oficialServicio2-rank'), name: formData.get('oficialServicio2-name') },
+                    oficialGuardia2: { rank: formData.get('oficialGuardia2-rank'), name: formData.get('oficialGuardia2-name') },
+                    confecciono1: { time: formData.get('confecciono1-time'), rank: formData.get('confecciono1-rank'), name: formData.get('confecciono1-name') },
+                    confecciono2: { time: formData.get('confecciono2-time'), rank: formData.get('confecciono2-rank'), name: formData.get('confecciono2-name') },
+                };
+                setState({ headerData: newHeaderData });
+                closeModal();
+            });
+        }
+
+        function renderDrillDownModal(title, data) {
+            const tableHeaders = ['Fecha', 'Estación', 'Hecho/Tipo', 'Uso', 'Calle', 'Altura'];
+            const tableBody = data.length > 0
+                ? data.map(item => `
+                    <tr class="hover:bg-gray-700/60 transition-colors duration-200">
+                        ${[
+                            `${item.dia}/${item.mes}/${item.ano}`,
+                            item.estacion,
+                            item.hechoTipo,
+                            item.uso,
+                            item.calle,
+                            item.altura
+                        ].map(val => `<td class="px-2 py-1.5 whitespace-nowrap border-r border-gray-600">${sanitizeHTML(val)}</td>`).join('')}
+                    </tr>
+                `).join('')
+                : `<tr><td colspan="${tableHeaders.length}" class="text-center py-4 text-gray-400">No hay datos para esta selección.</td></tr>`;
+
+            const content = `
+                <div class="overflow-x-auto rounded-lg shadow-lg border border-gray-700">
+                    <table class="min-w-full divide-y divide-gray-600 font-mono text-xs">
+                        <thead class="bg-gray-700">
+                            <tr>${tableHeaders.map(h => `<th scope="col" class="px-2 py-2 text-left font-medium text-gray-300 uppercase tracking-wider border-r border-gray-600 last:border-r-0">${h}</th>`).join('')}</tr>
+                        </thead>
+                        <tbody class="bg-gray-800 divide-y divide-gray-600">${tableBody}</tbody>
+                    </table>
+                </div>
+                <div class="pt-4 flex justify-end">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-500">Cerrar</button>
+                </div>
+            `;
+            renderModal(title, content, null, 'max-w-6xl');
+        }
+
+        // --- Renderizado de Páginas ---
+
+        function renderHomePage() {
+            const { interventions, headerData } = state;
+            const sortedInterventions = [...interventions].sort((a, b) => {
+                try {
+                  const dateA = new Date(parseInt(a.ano), parseInt(a.mes) - 1, parseInt(a.dia), ...(a.despacho || "0:0").split(':').map(Number));
+                  const dateB = new Date(parseInt(b.ano), parseInt(b.mes) - 1, parseInt(b.dia), ...(b.despacho || "0:0").split(':').map(Number));
+                  return dateA.getTime() - dateB.getTime();
+                } catch(e) { return 0; }
+            });
+
+            const tableHeaders = ['Interv', 'Día', 'Mes', 'Año', 'N° Carta', 'Estación', 'Hecho/Tipo', 'Uso', 'Planta/Piso', 'Despach', 'Present', 'Despues', 'Regres', 'Duracion', 'Calle', 'Altura', 'Causas', 'Cria', 'Juzg', 'VM', 'VF', 'FM', 'FF', 'Acciones'];
+
+            const tableRow = (item) => {
+                const hechoTipoLower = (item.hechoTipo || '').toLowerCase();
+                const isIncendio = hechoTipoLower.includes('incendio') && hechoTipoLower !== 'alarma de incendio' && hechoTipoLower !== 'pedido de incendio';
+                const despues = calculateTimeDiff(item.despacho, item.presente);
+                const duracion = calculateTimeDiff(item.presente, item.regreso);
+                return `
+                    <tr class="${isIncendio ? 'bg-red-600/70 text-white' : ''} hover:bg-gray-700/60 transition-colors duration-200" data-id="${item.id}">
+                        ${Object.entries({interv: item.interv, dia: item.dia, mes: item.mes, ano: item.ano, nCarta: item.nCarta, estacion: item.estacion, hechoTipo: item.hechoTipo, uso: item.uso, plantaPiso: item.plantaPiso, despacho: item.despacho, presente: item.presente, despues: despues, regreso: item.regreso, duracion: duracion, calle: item.calle, altura: item.altura, causas: item.causas, cria: item.cria, juzg: item.juzg, vm: item.vm, vf: item.vf, fm: item.fm, ff: item.ff}).map(([key, value]) => `<td class="px-2 py-1.5 whitespace-nowrap border-r border-gray-600 ${key === 'hechoTipo' && isIncendio ? 'font-semibold text-white' : ''} ${key === 'despues' ? 'font-semibold text-cyan-400' : ''} ${key === 'duracion' ? 'font-semibold text-amber-400' : ''}">${sanitizeHTML(value)}</td>`).join('')}
+                        <td class="px-2 py-1.5 whitespace-nowrap">
+                            <div class="flex items-center space-x-2">
+                                <button data-action="edit" data-id="${item.id}" class="text-blue-400 hover:text-blue-300" aria-label="Editar">${ICONS.edit('w-4 h-4')}</button>
+                                <button data-action="delete" data-id="${item.id}" class="text-red-400 hover:text-red-300" aria-label="Eliminar">${ICONS.delete}</button>
+                            </div>
+                        </td>
+                    </tr>`;
+            };
+
+            const renderAppHeader = (data) => {
+                const headerItem = (label, value) => `
+                    <div class="flex flex-col sm:flex-row sm:items-baseline">
+                        <span class="font-semibold text-gray-400 w-full sm:w-48 flex-shrink-0">${sanitizeHTML(label)}:</span>
+                        <span class="text-white break-words">${sanitizeHTML(value)}</span>
+                    </div>`;
+                
+                return `
+                    <div class="bg-gray-800 p-4 rounded-lg shadow-lg mb-6 space-y-4">
+                        <h2 class="text-xl font-bold text-center text-white uppercase">Oficina Comando Operativo de Bomberos</h2>
+                        <h3 class="text-lg text-center text-gray-300">${sanitizeHTML(data.novedades)}</h3>
+                        
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-2 pt-4 border-t border-gray-700 font-mono text-sm">
+                            <div class="space-y-1">
+                                ${headerItem('Jefe de Inspecciones', `${data.jefeInspecciones.rank}: ${data.jefeInspecciones.name}`)}
+                                ${headerItem('Jefe de Servicio', `${data.jefeServicio.rank}: ${data.jefeServicio.name}`)}
+                                ${headerItem('Jefe de Guardia', `${data.jefeGuardia.rank}: ${data.jefeGuardia.name}`)}
+                                ${headerItem('Jefe de Reserva', `${data.jefeReserva.rank}: ${data.jefeReserva.name}`)}
+                            </div>
+
+                            <div class="space-y-1">
+                                ${headerItem('Oficial de Servicio 08 a 20 hs', `${data.oficialServicio1.rank} ${data.oficialServicio1.name}`)}
+                                ${headerItem('Oficial de Guardia 08 a 20 hs', `${data.oficialGuardia1.rank} ${data.oficialGuardia1.name}`)}
+                                ${headerItem('Oficial de Servicio 20 a 08 hs', `${data.oficialServicio2.rank} ${data.oficialServicio2.name}`)}
+                                ${headerItem('Oficial de Guardia 20 a 08 hs', `${data.oficialGuardia2.rank} ${data.oficialGuardia2.name}`)}
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-1 pt-2 border-t border-gray-700 font-mono text-sm">
+                             ${headerItem(`Confeccionó ${data.confecciono1.time}`, `${data.confecciono1.rank} ${data.confecciono1.name}`)}
+                             ${headerItem(`Confeccionó ${data.confecciono2.time}`, `${data.confecciono2.rank} ${data.confecciono2.name}`)}
+                        </div>
+                    </div>
+                `;
+            };
+
+            appContainer.innerHTML = `
+                <div class="space-y-4">
+                    ${renderAppHeader(headerData)}
+                    <div class="flex flex-wrap justify-end gap-3">
+                        <button id="import-excel-btn" class="flex items-center space-x-2 bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">${ICONS.upload}<span>Importar Excel</span></button>
+                        <button id="export-excel-btn" class="flex items-center space-x-2 bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">${ICONS.download}<span>Descargar Excel</span></button>
+                        <button id="export-pdf-btn" class="flex items-center space-x-2 bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">${ICONS.download}<span>Descargar PDF</span></button>
+                        <button id="edit-header-btn" class="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">${ICONS.edit()}<span>Editar Encabezado</span></button>
+                        <button id="add-intervention-btn" class="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">${ICONS.plus}<span>Agregar Intervención</span></button>
+                    </div>
+                    <input type="file" id="excel-file-input" class="hidden" accept=".xlsx, .xls">
+                    ${interventions.length > 0 ? `
+                        <div class="overflow-x-auto rounded-lg shadow-lg">
+                            <table class="min-w-full divide-y divide-gray-600 font-mono text-xs">
+                                <thead class="bg-gray-700"><tr>${tableHeaders.map(h => `<th scope="col" class="px-2 py-2 text-left font-medium text-gray-300 uppercase tracking-wider border-r border-gray-600 last:border-r-0">${h}</th>`).join('')}</tr></thead>
+                                <tbody class="bg-gray-800 divide-y divide-gray-600">${sortedInterventions.map(tableRow).join('')}</tbody>
+                            </table>
+                        </div>
+                    ` : `
+                        <div class="text-center py-16 bg-gray-800 rounded-lg">
+                            <p class="text-gray-400">No hay intervenciones registradas.</p>
+                            <p class="text-gray-500 mt-2">Haga clic en "Agregar Intervención" para comenzar.</p>
+                        </div>
+                    `}
+                </div>
+            `;
+            attachHomePageListeners();
+        }
+
+        function renderSettingsPage() {
+            const { editableLists } = state;
+
+            const listEditor = (key, title) => {
+                const items = editableLists[key];
+                const sortedItems = [...items].sort((a, b) => a.localeCompare(b));
+                return `
+                    <div class="bg-gray-800 p-6 rounded-lg shadow-lg flex flex-col" data-list-key="${key}">
+                        <h3 class="text-xl font-semibold text-white mb-4">${title}</h3>
+                        <form class="flex gap-2 mb-2" data-action="add">
+                            <input type="text" placeholder="Añadir nuevo elemento..." class="flex-grow bg-gray-700 border border-gray-600 rounded-md shadow-sm text-white p-2 focus:ring-blue-500 focus:border-blue-500" />
+                            <button type="submit" class="flex-shrink-0 bg-blue-600 hover:bg-blue-500 text-white font-bold p-2 rounded-md transition-colors duration-200 disabled:bg-gray-500" disabled>${ICONS.plus}</button>
+                        </form>
+                        <p class="text-red-400 text-sm mb-2 h-5"></p>
+                        <div class="flex-grow overflow-y-auto max-h-72 border border-gray-700 rounded-md p-2 mt-2">
+                            ${sortedItems.length > 0 ? `
+                                <ul class="divide-y divide-gray-700">
+                                    ${sortedItems.map(item => `
+                                        <li class="flex items-center justify-between py-2 pr-2">
+                                            <span class="text-gray-300 text-sm break-all">${sanitizeHTML(item)}</span>
+                                            <button data-action="delete" data-item="${sanitizeHTML(item)}" class="text-red-500 hover:text-red-400 ml-4" aria-label="Eliminar ${sanitizeHTML(item)}">${ICONS.delete}</button>
+                                        </li>
+                                    `).join('')}
+                                </ul>` : `<p class="text-gray-500 text-center py-4">No hay elementos en esta lista.</p>`
+                            }
+                        </div>
+                    </div>`;
+            };
+
+            appContainer.innerHTML = `
+                <div class="space-y-8">
+                    <h1 class="text-3xl font-bold text-white">Editar Listas Desplegables</h1>
+                    <p class="text-gray-400 max-w-3xl">Aquí puede personalizar las opciones que aparecen en los menús desplegables del formulario de intervención. Los cambios se guardan automáticamente en su navegador.</p>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        ${listEditor('estaciones', 'Estaciones')}
+                        ${listEditor('hechosTipos', 'Hechos/Tipos')}
+                        ${listEditor('usos', 'Usos')}
+                        ${listEditor('causas', 'Causas')}
+                    </div>
+                </div>
+            `;
+            attachSettingsPageListeners();
+        }
+
+        function getFilteredInterventions() {
+            const { interventions, dashboardFilters } = state;
+            const { startDate, endDate, estaciones, hechosTipos, usos } = dashboardFilters;
+
+            return interventions.filter(i => {
+                // Date filter
+                if (startDate || endDate) {
+                    try {
+                        const itemDate = new Date(parseInt(i.ano), parseInt(i.mes) - 1, parseInt(i.dia));
+                        itemDate.setHours(0,0,0,0);
+                        if (startDate) {
+                           const filterStartDate = new Date(startDate);
+                           filterStartDate.setUTCHours(0,0,0,0);
+                           if (itemDate < filterStartDate) return false;
+                        }
+                        if (endDate) {
+                            const filterEndDate = new Date(endDate);
+                            filterEndDate.setUTCHours(0,0,0,0);
+                            if (itemDate > filterEndDate) return false;
+                        }
+                    } catch (e) { /* ignore invalid dates in data */ }
+                }
+
+                // Multi-select filters
+                if (estaciones.length > 0 && !estaciones.includes(i.estacion)) return false;
+                if (hechosTipos.length > 0 && !hechosTipos.includes(i.hechoTipo)) return false;
+                if (usos.length > 0 && !usos.includes(i.uso)) return false;
+
+                return true;
+            });
+        }
+        
+        function renderDashboardCharts(filteredInterventions, onChartClick) {
+            const chartConfigs = [
+                { id: 'hechos-chart', type: 'bar', groupBy: 'hechoTipo', title: 'Intervenciones por Tipo de Hecho' },
+                { id: 'estaciones-chart', type: 'pie', groupBy: 'estacion', title: 'Distribución por Estación' },
+                { id: 'tendencia-chart', type: 'line', groupBy: 'date', title: 'Tendencia de Intervenciones' }
+            ];
+
+            const baseColors = ['#3b82f6', '#22c55e', '#ef4444', '#eab308', '#8b5cf6', '#f97316', '#14b8a6', '#d946ef', '#06b6d4', '#f43f5e', '#65a30d', '#c026d3'];
+
+            chartConfigs.forEach(config => {
+                const ctx = document.getElementById(config.id)?.getContext('2d');
+                if (!ctx) return;
+
+                let labels, values;
+
+                if (config.groupBy === 'date') {
+                    const countsByDate = filteredInterventions.reduce((acc, i) => {
+                        const dateStr = `${i.ano}-${String(i.mes).padStart(2, '0')}-${String(i.dia).padStart(2, '0')}`;
+                        acc[dateStr] = (acc[dateStr] || 0) + 1;
+                        return acc;
+                    }, {});
+                    const sortedDates = Object.entries(countsByDate).sort(([a], [b]) => new Date(a) - new Date(b));
+                    labels = sortedDates.map(([date]) => new Date(date).toLocaleDateString('es-ES', { timeZone: 'UTC', day: '2-digit', month: '2-digit' }));
+                    values = sortedDates.map(([, count]) => count);
+                } else {
+                    const counts = countBy(config.groupBy, filteredInterventions);
+                    const sortedData = Object.entries(counts).sort(([, a], [, b]) => b - a);
+                    labels = sortedData.map(item => item[0]);
+                    values = sortedData.map(item => item[1]);
+                }
+
+                if (window[config.id] instanceof Chart) {
+                    window[config.id].destroy();
+                }
+
+                const colors = Array.from({ length: labels.length }, (_, i) => baseColors[i % baseColors.length]);
+                
+                window[config.id] = new Chart(ctx, {
+                    type: config.type,
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: `Conteo`,
+                            data: values,
+                            backgroundColor: ['pie', 'doughnut'].includes(config.type) ? colors : 'rgba(59, 130, 246, 0.7)',
+                            borderColor: ['pie', 'doughnut'].includes(config.type) ? '#1f2937' : 'rgba(59, 130, 246, 1)',
+                            borderWidth: 2,
+                            tension: config.type === 'line' ? 0.3 : undefined,
+                            pointBackgroundColor: config.type === 'line' ? 'rgba(59, 130, 246, 1)' : undefined,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        onClick: (e, elements) => {
+                            if (elements.length > 0 && config.groupBy !== 'date') {
+                                const clickedIndex = elements[0].index;
+                                const clickedLabel = labels[clickedIndex];
+                                onChartClick(config.groupBy, clickedLabel);
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: ['pie', 'doughnut'].includes(config.type),
+                                position: 'right',
+                                labels: { color: '#d1d5db', boxWidth: 12, padding: 15 }
+                            },
+                            title: {
+                                display: true, text: config.title, color: '#ffffff', font: { size: 16 }
+                            },
+                            tooltip: {
+                                backgroundColor: '#1f2937', titleColor: '#ffffff', bodyColor: '#d1d5db'
+                            },
+                            datalabels: {
+                                color: '#FFFFFF',
+                                font: { weight: 'bold', size: 11 },
+                                textStrokeColor: '#000000',
+                                textStrokeWidth: 2,
+                                anchor: 'center',
+                                align: 'center',
+                                formatter: (value) => (value > 0 ? value : ''),
+                            }
+                        },
+                        scales: ['bar', 'line'].includes(config.type) ? {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { color: '#d1d5db' },
+                                grid: { color: '#374151' }
+                            },
+                            x: {
+                                ticks: { color: '#d1d5db' },
+                                grid: { display: false }
+                            }
+                        } : {}
+                    }
+                });
+            });
+        }
+
+        function getDashboardKpis(filteredInterventions) {
+            const totals = filteredInterventions.reduce((acc, i) => {
+                acc.vm += Number(i.vm) || 0;
+                acc.vf += Number(i.vf) || 0;
+                acc.fm += Number(i.fm) || 0;
+                acc.ff += Number(i.ff) || 0;
+                return acc;
+            }, { vm: 0, vf: 0, fm: 0, ff: 0 });
+
+            let totalDespuesMinutes = 0, countDespues = 0, totalDuracionMinutes = 0, countDuracion = 0;
+            filteredInterventions.forEach(i => {
+                const despuesMins = timeStringToMinutes(calculateTimeDiff(i.despacho, i.presente));
+                if (despuesMins !== null) { totalDespuesMinutes += despuesMins; countDespues++; }
+                const duracionMins = timeStringToMinutes(calculateTimeDiff(i.presente, i.regreso));
+                if (duracionMins !== null) { totalDuracionMinutes += duracionMins; countDuracion++; }
+            });
+            const avgDespues = countDespues > 0 ? minutesToTimeString(totalDespuesMinutes / countDespues) : '--:--';
+            const avgDuracion = countDuracion > 0 ? minutesToTimeString(totalDuracionMinutes / countDuracion) : '--:--';
+            
+            return {
+                total: filteredInterventions.length,
+                victimasFallecidos: `${totals.vm + totals.vf} / ${totals.fm + totals.ff}`,
+                avgDespues,
+                avgDuracion
+            };
+        }
+
+        function renderStatisticsPage() {
+            const { interventions, editableLists, dashboardFilters } = state;
+            
+            if (interventions.length === 0) {
+                appContainer.innerHTML = `<div class="text-center py-16 bg-gray-800 rounded-lg"><h1 class="text-3xl font-bold text-white mb-4">Dashboard de Análisis</h1><p class="text-gray-400">No hay intervenciones para analizar.</p></div>`;
+                return;
+            }
+
+            const filteredInterventions = getFilteredInterventions();
+            const kpis = getDashboardKpis(filteredInterventions);
+            
+            const kpiCard = (title, value, subtext = '') => `
+                <div class="bg-gray-800 p-4 rounded-lg shadow-lg text-center">
+                    <h3 class="text-sm font-medium text-gray-400 uppercase tracking-wider">${title}</h3>
+                    <p class="text-3xl font-bold text-white mt-2">${value}</p>
+                    ${subtext ? `<p class="text-xs text-gray-500 mt-1">${subtext}</p>` : ''}
+                </div>`;
+            
+            const createMultiSelect = (id, label, list, selected) => {
+                const sortedList = [...list].sort();
+                return `<div>
+                    <label for="${id}" class="block text-sm font-medium text-gray-300 mb-1">${label}</label>
+                    <select id="${id}" multiple class="w-full bg-gray-700 border-gray-600 rounded-md text-white p-2">
+                        ${sortedList.map(item => `<option value="${sanitizeHTML(item)}" ${selected.includes(item) ? 'selected' : ''}>${sanitizeHTML(item)}</option>`).join('')}
+                    </select>
+                </div>`;
+            };
+
+            // --- Main render ---
+            appContainer.innerHTML = `
+                <div class="space-y-6">
+                    <h1 class="text-3xl font-bold text-white">Dashboard de Análisis</h1>
+                    
+                    <!-- Filter Section -->
+                    <div class="bg-gray-800 p-4 rounded-lg shadow-lg space-y-4">
+                        <h2 class="text-xl font-semibold text-white">Filtros</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 items-end">
+                            <div><label for="start-date" class="block text-sm font-medium text-gray-300 mb-1">Fecha Inicio</label><input type="date" id="start-date" value="${dashboardFilters.startDate}" class="w-full bg-gray-700 border-gray-600 rounded-md text-white p-2"></div>
+                            <div><label for="end-date" class="block text-sm font-medium text-gray-300 mb-1">Fecha Fin</label><input type="date" id="end-date" value="${dashboardFilters.endDate}" class="w-full bg-gray-700 border-gray-600 rounded-md text-white p-2"></div>
+                            ${createMultiSelect('filter-estaciones', 'Estaciones', editableLists.estaciones, dashboardFilters.estaciones)}
+                            ${createMultiSelect('filter-hechos', 'Tipos de Hecho', editableLists.hechosTipos, dashboardFilters.hechosTipos)}
+                            ${createMultiSelect('filter-usos', 'Usos', editableLists.usos, dashboardFilters.usos)}
+                        </div>
+                        <div class="flex justify-end gap-3 pt-3 border-t border-gray-700">
+                             <button id="export-pptx-btn" class="flex items-center space-x-2 px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-500 transition-colors">${ICONS.presentation} <span>Generar Presentación</span></button>
+                            <button id="reset-filters-btn" class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-500">Limpiar Filtros</button>
+                            <button id="apply-filters-btn" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500">Aplicar Filtros</button>
+                        </div>
+                    </div>
+
+                    <!-- KPI Section -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        ${kpiCard('Intervenciones', kpis.total)}
+                        ${kpiCard('Víctimas / Fallecidos', kpis.victimasFallecidos)}
+                        ${kpiCard('T. Prom. Respuesta', kpis.avgDespues, '(despacho → presente)')}
+                        ${kpiCard('T. Prom. Permanencia', kpis.avgDuracion, '(presente → regreso)')}
+                    </div>
+
+                    <!-- Charts Section -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-gray-800 p-4 rounded-lg shadow-lg h-96 cursor-pointer hover:bg-gray-700/50 transition-colors" data-drilldown="hechoTipo"><canvas id="hechos-chart"></canvas></div>
+                        <div class="bg-gray-800 p-4 rounded-lg shadow-lg h-96 cursor-pointer hover:bg-gray-700/50 transition-colors" data-drilldown="estacion"><canvas id="estaciones-chart"></canvas></div>
+                    </div>
+                    <div class="bg-gray-800 p-4 rounded-lg shadow-lg h-96"><canvas id="tendencia-chart"></canvas></div>
+                </div>
+            `;
+
+            const onChartClickHandler = (groupBy, label) => {
+                const drillDownData = filteredInterventions.filter(i => (i[groupBy] || 'No especificado') === label);
+                renderDrillDownModal(`Detalle de ${label} (${drillDownData.length})`, drillDownData);
+            };
+
+            renderDashboardCharts(filteredInterventions, onChartClickHandler);
+            attachStatisticsPageListeners();
+        }
+
+        // =================================================================================
+        // MANEJADORES DE EVENTOS
+        // =================================================================================
+
+        function attachHomePageListeners() {
+            document.getElementById('add-intervention-btn').addEventListener('click', () => renderInterventionForm());
+            document.getElementById('edit-header-btn').addEventListener('click', renderHeaderForm);
+            
+            document.getElementById('import-excel-btn').addEventListener('click', () => document.getElementById('excel-file-input').click());
+            document.getElementById('excel-file-input').addEventListener('change', handleImportFromExcel);
+
+            document.getElementById('export-excel-btn').addEventListener('click', handleExportToExcel);
+            const pdfBtn = document.getElementById('export-pdf-btn');
+            if (pdfBtn) {
+                pdfBtn.addEventListener('click', handleExportToPdf);
+            }
+
+            const tableBody = appContainer.querySelector('tbody');
+            if (tableBody) {
+                tableBody.addEventListener('click', (e) => {
+                    const button = e.target.closest('button[data-action]');
+                    if (!button) return;
+
+                    const { action, id } = button.dataset;
+                    if (action === 'edit') {
+                        renderInterventionForm(id);
+                    } else if (action === 'delete') {
+                        if (window.confirm('¿Está seguro de que desea eliminar esta intervención?')) {
+                            const interventions = state.interventions.filter(item => item.id !== id);
+                            setState({ interventions });
+                        }
+                    }
+                });
+            }
+        }
+        
+        function attachFooterListeners() {
+            const zoomInBtn = document.getElementById('zoom-in-btn');
+            const zoomOutBtn = document.getElementById('zoom-out-btn');
+            const zoomResetBtn = document.getElementById('zoom-reset-btn');
+
+            if (zoomInBtn) {
+                zoomInBtn.addEventListener('click', () => {
+                    const newZoom = Math.min(200, state.zoomLevel + 10);
+                    setState({ zoomLevel: newZoom });
+                });
+            }
+            if (zoomOutBtn) {
+                zoomOutBtn.addEventListener('click', () => {
+                    const newZoom = Math.max(50, state.zoomLevel - 10);
+                    setState({ zoomLevel: newZoom });
+                });
+            }
+            if (zoomResetBtn) {
+                zoomResetBtn.addEventListener('click', () => {
+                    if (state.zoomLevel !== 100) {
+                        setState({ zoomLevel: 100 });
+                    }
+                });
+            }
+        }
+
+        function attachSettingsPageListeners() {
+            appContainer.querySelectorAll('[data-list-key]').forEach(editor => {
+                const listKey = editor.dataset.listKey;
+                const form = editor.querySelector('form');
+                const input = form.querySelector('input');
+                const submitBtn = form.querySelector('button');
+                const errorP = editor.querySelector('.text-red-400');
+
+                input.addEventListener('input', () => {
+                    submitBtn.disabled = !input.value.trim();
+                    errorP.textContent = '';
+                });
+
+                form.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const newItem = input.value.trim();
+                    if (!newItem) return;
+
+                    if (state.editableLists[listKey].find(i => i.toLowerCase() === newItem.toLowerCase())) {
+                        errorP.textContent = 'Este elemento ya existe en la lista.';
+                    } else {
+                        const updatedList = [...state.editableLists[listKey], newItem];
+                        setState({
+                            editableLists: { ...state.editableLists, [listKey]: updatedList }
+                        });
+                        input.value = '';
+                        submitBtn.disabled = true;
+                    }
+                });
+
+                editor.addEventListener('click', (e) => {
+                    const button = e.target.closest('button[data-action="delete"]');
+                    if (button) {
+                        const itemToDelete = button.dataset.item;
+                         if (window.confirm(`¿Está seguro de que desea eliminar "${itemToDelete}"? Esta acción no se puede deshacer.`)) {
+                            const updatedList = state.editableLists[listKey].filter(item => item !== itemToDelete);
+                            setState({
+                                editableLists: { ...state.editableLists, [listKey]: updatedList }
+                            });
+                        }
+                    }
+                });
+            });
+        }
+
+        function attachStatisticsPageListeners() {
+            const applyBtn = document.getElementById('apply-filters-btn');
+            const resetBtn = document.getElementById('reset-filters-btn');
+            const pptxBtn = document.getElementById('export-pptx-btn');
+
+            const getSelectedOptions = (selectId) => {
+                const select = document.getElementById(selectId);
+                return select ? Array.from(select.selectedOptions).map(option => option.value) : [];
+            };
+
+            if (applyBtn) {
+                applyBtn.addEventListener('click', () => {
+                    const newFilters = {
+                        startDate: document.getElementById('start-date').value,
+                        endDate: document.getElementById('end-date').value,
+                        estaciones: getSelectedOptions('filter-estaciones'),
+                        hechosTipos: getSelectedOptions('filter-hechos'),
+                        usos: getSelectedOptions('filter-usos'),
+                    };
+                    setState({ dashboardFilters: newFilters });
+                });
+            }
+
+            if (resetBtn) {
+                resetBtn.addEventListener('click', () => {
+                    setState({ dashboardFilters: initialDashboardFilters });
+                });
+            }
+            
+            if (pptxBtn) {
+                pptxBtn.addEventListener('click', handleExportToPptx);
+            }
+        }
+
+        // =================================================================================
+        // LÓGICA DE EXPORTACIÓN / IMPORTACIÓN
+        // =================================================================================
+        
+        async function handleExportToPptx() {
+            const btn = document.getElementById('export-pptx-btn');
+            if (btn) btn.disabled = true;
+            document.body.style.cursor = 'wait';
+
+            if (typeof window.PptxGenJS === 'undefined') {
+                console.error("PptxGenJS library not loaded.");
+                alert("Error: La librería para crear presentaciones no se cargó correctamente. Por favor, revise su conexión a internet y refresque la página.");
+                if (btn) btn.disabled = false;
+                document.body.style.cursor = 'default';
+                return;
+            }
+
+            try {
+                const pptx = new window.PptxGenJS();
+
+                // --- Configuración de Diseño ---
+                pptx.defineLayout({ name: "LAYOUT_DARK", width: 13.33, height: 7.5 });
+                pptx.layout = "LAYOUT_DARK";
+
+                pptx.defineSlideMaster({
+                    title: "MASTER_SLIDE_DARK",
+                    background: { color: "1F2937" }, // bg-gray-800
+                    objects: [
+                        { text: {
+                            text: "Reporte de Intervenciones de Bomberos",
+                            options: { x: 0.5, y: 0.25, w: "93%", h: 0.5, align: "center", color: "FFFFFF", fontSize: 24, bold: true },
+                        }},
+                        { text: {
+                            text: `Generado: ${new Date().toLocaleDateString("es-ES")}`,
+                            options: { x: 0.5, y: 7.0, w: "45%", h: 0.25, align: "left", color: "A0AEC0", fontSize: 10 },
+                        }},
+                        { placeholder: {
+                            options: { name: "footer", type: "slideNumber", x: "90%", y: 7.0, w: 0.5, h: 0.25, align: "right", color: "A0AEC0", fontSize: 10 },
+                            text: "Número de Diapositiva",
+                        }}
+                    ],
+                });
+
+                // --- Diapositiva de Título ---
+                let slide = pptx.addSlide({ masterName: "MASTER_SLIDE_DARK" });
+                slide.addText("Análisis de Intervenciones", { x: 0.5, y: 2.0, w: "93%", h: 1.0, align: "center", fontSize: 48, color: "FFFFFF", bold: true });
+
+                const { startDate, endDate } = state.dashboardFilters;
+                let dateRangeText = "Período: Todos los datos registrados";
+                if (startDate && endDate) {
+                    dateRangeText = `Período: ${new Date(startDate + 'T00:00:00').toLocaleDateString("es-ES")} - ${new Date(endDate + 'T00:00:00').toLocaleDateString("es-ES")}`;
+                } else if (startDate) {
+                    dateRangeText = `Período: Desde ${new Date(startDate + 'T00:00:00').toLocaleDateString("es-ES")}`;
+                } else if (endDate) {
+                    dateRangeText = `Período: Hasta ${new Date(endDate + 'T00:00:00').toLocaleDateString("es-ES")}`;
+                }
+                slide.addText(dateRangeText, { x: 0.5, y: 3.2, w: "93%", h: 0.5, align: "center", fontSize: 20, color: "E5E7EB" });
+
+
+                // --- Diapositiva de KPIs ---
+                const filteredInterventions = getFilteredInterventions();
+                const kpis = getDashboardKpis(filteredInterventions);
+                
+                slide = pptx.addSlide({ masterName: "MASTER_SLIDE_DARK" });
+                slide.addText("Indicadores Clave de Rendimiento (KPIs)", { x: 0.5, y: 0.5, w: "93%", h: 0.75, align: 'left', fontSize: 32, color: "FFFFFF", bold: true });
+
+                const kpiBox = (x, y, title, value, valueColor) => {
+                    slide.addShape(pptx.shapes.RECTANGLE, { x, y, w: 5.9, h: 2.5, fill: { color: "2D3748" }, line: { color: "4A5568", width: 1 } });
+                    slide.addText(value, { x, y: y + 0.5, w: 5.9, h: 1.0, align: "center", fontSize: 36, bold: true, color: valueColor });
+                    slide.addText(title, { x, y: y + 1.5, w: 5.9, h: 0.5, align: "center", fontSize: 14, color: "D1D5DB" });
+                };
+                kpiBox(0.6, 1.5, 'Total Intervenciones', kpis.total.toString(), '3B82F6');
+                kpiBox(6.8, 1.5, 'Víctimas / Fallecidos', kpis.victimasFallecidos, 'FBBF24');
+                kpiBox(0.6, 4.2, 'T. Promedio Respuesta', kpis.avgDespues, '22D3EE');
+                kpiBox(6.8, 4.2, 'T. Promedio Permanencia', kpis.avgDuracion, 'F97316');
+
+                // --- Diapositivas de Gráficos ---
+                const addChartSlide = (title, chartId) => {
+                    const chartCanvas = document.getElementById(chartId);
+                    const chart = chartCanvas ? window[chartId] : null;
+
+                    if (chart && chartCanvas.height > 0) {
+                        const slide = pptx.addSlide({ masterName: "MASTER_SLIDE_DARK" });
+                        slide.addText(title, { x: 0.5, y: 0.5, w: "93%", h: 0.75, align: 'left', fontSize: 32, color: "FFFFFF", bold: true });
+                        const imgData = chart.toBase64Image();
+                        slide.addImage({ data: imgData, x: 1, y: 1.3, w: 11.33, h: 5.25 });
+                    } else {
+                        console.warn(`Chart with ID '${chartId}' not found or not rendered, skipping slide.`);
+                    }
+                }
+                addChartSlide("Intervenciones por Tipo de Hecho", "hechos-chart");
+                addChartSlide("Distribución de Intervenciones por Estación", "estaciones-chart");
+                addChartSlide("Tendencia Temporal de Intervenciones", "tendencia-chart");
+
+                // --- Descargar Archivo ---
+                await pptx.writeFile({ fileName: `Reporte_Intervenciones_${new Date().toISOString().slice(0, 10)}.pptx` });
+
+            } catch(err) {
+                console.error("Error generating presentation:", err);
+                alert("Ocurrió un error al generar la presentación. Por favor, revise la consola para más detalles.");
+            } finally {
+                if (btn) btn.disabled = false;
+                document.body.style.cursor = 'default';
+            }
+        }
+        
+        function handleImportFromExcel(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    
+                    if (jsonData.length < 2) {
+                        throw new Error("El archivo Excel está vacío o no tiene datos.");
+                    }
+
+                    const headers = jsonData[0].map(h => typeof h === 'string' ? h.trim() : h);
+                    const dataRows = jsonData.slice(1);
+                    
+                    const headerMap = {
+                        'Interv': 'interv', 'Día': 'dia', 'Mes': 'mes', 'Año': 'ano', 'N° Carta': 'nCarta', 'Estación': 'estacion', 'Hecho/Tipo': 'hechoTipo',
+                        'Uso': 'uso', 'Planta/Piso': 'plantaPiso', 'Despach': 'despacho', 'Present': 'presente', 'Regres': 'regreso', 'Calle': 'calle', 'Altura / Inters.': 'altura',
+                        'Causas': 'causas', 'Cria': 'cria', 'Juzg': 'juzg', 'VM': 'vm', 'VF': 'vf', 'FM': 'fm', 'FF': 'ff'
+                    };
+
+                    const essentialHeaders = ['Día', 'Mes', 'Año', 'Estación', 'Hecho/Tipo'];
+                    for (const h of essentialHeaders) {
+                        if (!headers.includes(h)) {
+                            throw new Error(`El archivo Excel no tiene la columna requerida: "${h}". Por favor, use un archivo con el formato correcto.`);
+                        }
+                    }
+                    
+                    const headerIndices = {};
+                    Object.keys(headerMap).forEach(key => {
+                        const index = headers.indexOf(key);
+                        if (index !== -1) {
+                            headerIndices[headerMap[key]] = index;
+                        }
+                    });
+
+                    const newInterventions = dataRows.map(row => {
+                        if (row.length === 0 || row.every(cell => cell === null || cell === '')) return null;
+
+                        const intervention = {};
+                        for (const key in headerIndices) {
+                            const index = headerIndices[key];
+                            let value = row[index];
+
+                            if ((key === 'despacho' || key === 'presente' || key === 'regreso') && value instanceof Date) {
+                                const excelTime = value.getTime() - new Date(Date.UTC(1899, 11, 30)).getTime();
+                                if (excelTime > 0) {
+                                    const hours = Math.floor((excelTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                                    const minutes = Math.floor((excelTime % (1000 * 60 * 60)) / (1000 * 60));
+                                    value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                                } else {
+                                     value = '00:00';
+                                }
+                            }
+                            intervention[key] = value !== undefined && value !== null ? String(value) : '';
+                        }
+
+                        const numberFields = ['vm', 'vf', 'fm', 'ff', 'dia', 'mes', 'ano'];
+                        numberFields.forEach(field => {
+                            intervention[field] = parseInt(intervention[field], 10) || (field.startsWith('v') || field.startsWith('f') ? 0 : '');
+                        });
+                        
+                        intervention.id = crypto.randomUUID();
+
+                        if (!intervention.ano || !intervention.mes || !intervention.dia) {
+                            console.warn('Fila omitida por falta de fecha:', row);
+                            return null;
+                        }
+
+                        return intervention;
+                    }).filter(Boolean);
+
+                    if (newInterventions.length > 0) {
+                        const updatedInterventions = [...state.interventions, ...newInterventions];
+                        setState({ interventions: updatedInterventions });
+                        alert(`${newInterventions.length} registro(s) importado(s) exitosamente.`);
+                    } else {
+                        alert("No se encontraron nuevos registros para importar en el archivo.");
+                    }
+
+                } catch (error) {
+                    console.error("Error al importar el archivo Excel:", error);
+                    alert("Error al importar el archivo: " + error.message);
+                } finally {
+                    event.target.value = '';
+                }
+            };
+            reader.onerror = (error) => {
+                console.error("Error al leer el archivo:", error);
+                alert("Ocurrió un error al leer el archivo.");
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function handleExportToExcel() {
+            const { headerData, interventions } = state;
+            const wb = XLSX.utils.book_new();
+            const sheetData = [];
+
+            // --- 1. Definir Estilos ---
+            const borderAll = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+            
+            const titleStyle = { font: { bold: true, sz: 14 }, alignment: { horizontal: "center", vertical: "center" } };
+            const mainHeaderStyle = { font: { bold: true }, border: borderAll };
+            const tableHeaderStyle = { font: { bold: true, color: {rgb: "FFFFFF"}}, fill: { fgColor: { rgb: "4A5568" } }, border: borderAll, alignment: { horizontal: "center", vertical: "center", wrapText: true } };
+            
+            const defaultCellStyle = { border: borderAll };
+            const zebraStyle = { fill: { fgColor: { rgb: "2D3748" } }, border: borderAll }; // bg-gray-700
+            
+            const rightAlignStyle = { border: borderAll, alignment: { horizontal: "right" } };
+            const zebraRightAlignStyle = { fill: { fgColor: { rgb: "2D3748" } }, border: borderAll, alignment: { horizontal: "right" } }; // bg-gray-700
+            
+            const incendioStyle = { font: { color: { rgb: "FFFFFF" }, bold: true }, fill: { fgColor: { rgb: "C53030" } }, border: borderAll }; // bg-red-600
+            const incendioRightAlignStyle = { ...incendioStyle, alignment: { horizontal: "right" } };
+            
+            // --- 2. Construir Encabezado en un Array (sheetData) ---
+            sheetData.push(['OFICINA COMANDO OPERATIVO DE BOMBEROS']);
+            sheetData.push([headerData.novedades]);
+            sheetData.push([]); // Fila vacía
+
+            const jefeOficialRows = [
+                { jK: 'jefeInspecciones', jL: 'JEFE DE INSPECCIONES', oK: 'oficialServicio1', oL: 'OFICIAL DE SERVICIO', oT: '08 a 20 hs'},
+                { jK: 'jefeServicio', jL: 'JEFE DE SERVICIO', oK: 'oficialGuardia1', oL: 'OFICIAL DE GUARDIA', oT: '08 a 20 hs'},
+                { jK: 'jefeGuardia', jL: 'JEFE DE GUARDIA', oK: 'oficialServicio2', oL: 'OFICIAL DE SERVICIO', oT: '20 a 08 hs'},
+                { jK: 'jefeReserva', jL: 'JEFE DE RESERVA', oK: 'oficialGuardia2', oL: 'OFICIAL DE GUARDIA', oT: '20 a 08 hs'},
+            ];
+            jefeOficialRows.forEach(row => {
+                const jefe = headerData[row.jK];
+                const oficial = headerData[row.oK];
+                const excelRow = Array(23).fill(null);
+                excelRow[0] = row.jL;
+                excelRow[1] = `${jefe.rank}: ${jefe.name}`;
+                excelRow[8] = row.oL;
+                excelRow[10] = row.oT;
+                excelRow[12] = oficial.rank;
+                excelRow[14] = oficial.name;
+                sheetData.push(excelRow);
+            });
+            
+            const confeccionoRow1 = Array(23).fill(null);
+            confeccionoRow1[0] = `Confeccionó ${headerData.confecciono1.time}`;
+            confeccionoRow1[1] = `${headerData.confecciono1.rank} ${headerData.confecciono1.name}`;
+            sheetData.push(confeccionoRow1);
+
+            const confeccionoRow2 = Array(23).fill(null);
+            confeccionoRow2[0] = `Confeccionó ${headerData.confecciono2.time}`;
+            confeccionoRow2[1] = `${headerData.confecciono2.rank} ${headerData.confecciono2.name}`;
+            sheetData.push(confeccionoRow2);
+            
+            sheetData.push([]); // Fila vacía
+            
+            const headerRowCount = sheetData.length;
+            const tableHeaders = ['Interv', 'Día', 'Mes', 'Año', 'N° Carta', 'Estación', 'Hecho/Tipo', 'Uso', 'Planta/Piso', 'Despach', 'Present', 'Despues', 'Regres', 'Duracion', 'Calle', 'Altura / Inters.', 'Causas', 'Cria', 'Juzg', 'VM', 'VF', 'FM', 'FF'];
+            sheetData.push(tableHeaders);
+            
+            // --- 3. Construir Filas de Datos ---
+            const sortedInterventions = [...interventions].sort((a, b) => {
+                try {
+                    const dateA = new Date(parseInt(a.ano), parseInt(a.mes) - 1, parseInt(a.dia), ...(a.despacho || "0:0").split(':').map(Number));
+                    const dateB = new Date(parseInt(b.ano), parseInt(b.mes) - 1, parseInt(b.dia), ...(b.despacho || "0:0").split(':').map(Number));
+                    return dateA.getTime() - dateB.getTime();
+                } catch(e) { return 0; }
+            });
+
+            sortedInterventions.forEach(item => {
+                const despues = calculateTimeDiff(item.despacho, item.presente);
+                const duracion = calculateTimeDiff(item.presente, item.regreso);
+                sheetData.push([
+                    item.interv, Number(item.dia), Number(item.mes), Number(item.ano), item.nCarta, item.estacion, item.hechoTipo,
+                    item.uso, item.plantaPiso, item.despacho, item.presente, despues, item.regreso,
+                    duracion, item.calle, item.altura, item.causas, item.cria, item.juzg,
+                    Number(item.vm), Number(item.vf), Number(item.fm), Number(item.ff)
+                ]);
+            });
+
+            // --- 4. Crear Hoja y Aplicar Estilos, etc. ---
+            const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+            // Aplicar estilos
+            for (let R = 0; R < sheetData.length; R++) {
+                for (let C = 0; C < sheetData[R].length; C++) {
+                    const cell_address = { c: C, r: R };
+                    const ref = XLSX.utils.encode_cell(cell_address);
+                    if (!ws[ref]) continue;
+
+                    if (R < headerRowCount) { // Estilos del encabezado
+                        if (R <= 1) ws[ref].s = titleStyle;
+                        else if (R >= 3 && R <= 8) { // Jefes/Oficiales y Confecciono
+                           ws[ref].s = {font: { bold: true } };
+                        }
+                    } else if (R === headerRowCount) { // Estilos de la cabecera de la tabla
+                        ws[ref].s = tableHeaderStyle;
+                    } else { // Estilos de los datos
+                        const isZebra = (R - headerRowCount) % 2 === 0;
+                        const item = sortedInterventions[R - (headerRowCount + 1)];
+                        const hechoTipoLower = item ? (item.hechoTipo || '').toLowerCase() : '';
+                        const isIncendio = hechoTipoLower.includes('incendio') && hechoTipoLower !== 'alarma de incendio' && hechoTipoLower !== 'pedido de incendio';
+                        const isNumberCol = (C >= 1 && C <= 3) || C >= 19;
+
+                        if (isIncendio) {
+                            ws[ref].s = isNumberCol ? incendioRightAlignStyle : incendioStyle;
+                        } else if (isZebra) {
+                            ws[ref].s = isNumberCol ? zebraRightAlignStyle : zebraStyle;
+                        } else {
+                            ws[ref].s = isNumberCol ? rightAlignStyle : defaultCellStyle;
+                        }
+                    }
+                }
+            }
+
+            // Aplicar combinaciones
+            ws['!merges'] = [
+                { s: { r: 0, c: 0 }, e: { r: 0, c: 22 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 22 } },
+                { s: { r: 3, c: 1 }, e: { r: 3, c: 7 } }, { s: { r: 3, c: 14 }, e: { r: 3, c: 22 } },
+                { s: { r: 4, c: 1 }, e: { r: 4, c: 7 } }, { s: { r: 4, c: 14 }, e: { r: 4, c: 22 } },
+                { s: { r: 5, c: 1 }, e: { r: 5, c: 7 } }, { s: { r: 5, c: 14 }, e: { r: 5, c: 22 } },
+                { s: { r: 6, c: 1 }, e: { r: 6, c: 7 } }, { s: { r: 6, c: 14 }, e: { r: 6, c: 22 } },
+                { s: { r: 7, c: 1 }, e: { r: 7, c: 22 } },
+                { s: { r: 8, c: 1 }, e: { r: 8, c: 22 } },
+            ];
+
+            // Aplicar anchos de columna
+            ws['!cols'] = [
+                { wch: 8 }, { wch: 4 }, { wch: 4 }, { wch: 5 }, { wch: 10 }, { wch: 35 },
+                { wch: 35 }, { wch: 35 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
+                { wch: 10 }, { wch: 10 }, { wch: 25 }, { wch: 15 }, { wch: 20 },
+                { wch: 6 }, { wch: 6 }, { wch: 4 }, { wch: 4 }, { wch: 4 }, { wch: 4 }
+            ];
+            
+            // Aplicar Paneles Inmovilizados y AutoFiltro
+            const freezeRow = headerRowCount + 1;
+            ws['!views'] = [{ state: 'frozen', ySplit: freezeRow }];
+            const autoFilterRange = XLSX.utils.encode_range({ s: { c: 0, r: headerRowCount }, e: { c: tableHeaders.length - 1, r: sheetData.length -1 } });
+            ws['!autofilter'] = { ref: autoFilterRange };
+
+            XLSX.utils.book_append_sheet(wb, ws, 'Hoja1');
+            XLSX.writeFile(wb, `intervenciones_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        }
+
+        function handleExportToPdf() {
+            const { headerData, interventions } = state;
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({
+                orientation: 'landscape',
+                unit: 'pt',
+                format: 'a4'
+            });
+
+            const pageW = doc.internal.pageSize.getWidth();
+            const pageH = doc.internal.pageSize.getHeight();
+            const totalPagesExp = '{total_pages_count_string}';
+            
+            // Define colors for a professional, light-theme PDF
+            const primaryTextColor = '#1f2937'; // gray-800
+            const secondaryTextColor = '#4b5563'; // gray-600
+            const headerFillColor = '#f3f4f6'; // gray-100
+            const headerTextColor = '#111827'; // gray-900
+            const borderColor = '#d1d5db'; // gray-300
+            const alternateRowColor = '#f9fafb'; // gray-50
+            const incendioFillColor = '#fee2e2'; // red-100
+            const incendioTextColor = '#991b1b'; // red-800
+
+            doc.setTextColor(primaryTextColor);
+
+            // --- Header Section using autoTable for clean layout ---
+            doc.setFontSize(16).setFont(undefined, 'bold');
+            doc.text('OFICINA COMANDO OPERATIVO DE BOMBEROS', pageW / 2, 30, { align: 'center' });
+            doc.setFontSize(12).setFont(undefined, 'normal');
+            doc.text(headerData.novedades, pageW / 2, 45, { align: 'center' });
+            
+            const headerInfoBody = [
+                [
+                    { content: 'JEFE DE INSPECCIONES:', styles: { fontStyle: 'bold' } },
+                    `${headerData.jefeInspecciones.rank}: ${headerData.jefeInspecciones.name}`,
+                    { content: 'OFICIAL DE SERVICIO 08 a 20 hs:', styles: { fontStyle: 'bold' } },
+                    `${headerData.oficialServicio1.rank} ${headerData.oficialServicio1.name}`
+                ],
+                [
+                    { content: 'JEFE DE SERVICIO:', styles: { fontStyle: 'bold' } },
+                    `${headerData.jefeServicio.rank}: ${headerData.jefeServicio.name}`,
+                    { content: 'OFICIAL DE GUARDIA 08 a 20 hs:', styles: { fontStyle: 'bold' } },
+                    `${headerData.oficialGuardia1.rank} ${headerData.oficialGuardia1.name}`
+                ],
+                [
+                    { content: 'JEFE DE GUARDIA:', styles: { fontStyle: 'bold' } },
+                    `${headerData.jefeGuardia.rank}: ${headerData.jefeGuardia.name}`,
+                    { content: 'OFICIAL DE SERVICIO 20 a 08 hs:', styles: { fontStyle: 'bold' } },
+                    `${headerData.oficialServicio2.rank} ${headerData.oficialServicio2.name}`
+                ],
+                [
+                    { content: 'JEFE DE RESERVA:', styles: { fontStyle: 'bold' } },
+                    `${headerData.jefeReserva.rank}: ${headerData.jefeReserva.name}`,
+                    { content: 'OFICIAL DE GUARDIA 20 a 08 hs:', styles: { fontStyle: 'bold' } },
+                    `${headerData.oficialGuardia2.rank} ${headerData.oficialGuardia2.name}`
+                ],
+            ];
+
+            doc.autoTable({
+                body: headerInfoBody,
+                startY: 60,
+                theme: 'plain',
+                styles: { textColor: primaryTextColor, fontSize: 8 },
+                columnStyles: {
+                    0: { cellWidth: 120 },
+                    1: { cellWidth: 'auto' },
+                    2: { cellWidth: 140 },
+                    3: { cellWidth: 'auto' },
+                },
+            });
+            
+            let lastY = doc.lastAutoTable.finalY;
+
+            doc.autoTable({
+                body: [
+                    [
+                        { content: `Confeccionó ${headerData.confecciono1.time}:`, styles: { fontStyle: 'bold' } },
+                        `${headerData.confecciono1.rank} ${headerData.confecciono1.name}`,
+                    ],
+                    [
+                        { content: `Confeccionó ${headerData.confecciono2.time}:`, styles: { fontStyle: 'bold' } },
+                        `${headerData.confecciono2.rank} ${headerData.confecciono2.name}`,
+                    ],
+                ],
+                startY: lastY + 5,
+                theme: 'plain',
+                styles: { textColor: primaryTextColor, fontSize: 8 },
+                columnStyles: { 0: { cellWidth: 120 } }
+            });
+
+            // --- Main Data Table ---
+            const tableHeaders = ['Fecha', 'N° Carta', 'Estación', 'Hecho/Tipo', 'Uso', 'Calle', 'Altura', 'Despacho', 'Llegada', 'Regreso', 'T.Resp', 'T.Perm', 'Víctimas', 'Fallecidos', 'Causas'];
+            
+            const sortedInterventions = [...interventions].sort((a, b) => {
+                try {
+                    const dateA = new Date(parseInt(a.ano), parseInt(a.mes) - 1, parseInt(a.dia), ...(a.despacho || "0:0").split(':').map(Number));
+                    const dateB = new Date(parseInt(b.ano), parseInt(b.mes) - 1, parseInt(b.dia), ...(b.despacho || "0:0").split(':').map(Number));
+                    return dateA.getTime() - dateB.getTime();
+                } catch(e) { return 0; }
+            });
+
+            const tableData = sortedInterventions.map(item => {
+                const tResp = calculateTimeDiff(item.despacho, item.presente);
+                const tPerm = calculateTimeDiff(item.presente, item.regreso);
+                const victimas = (Number(item.vm) || 0) + (Number(item.vf) || 0);
+                const fallecidos = (Number(item.fm) || 0) + (Number(item.ff) || 0);
+                return [
+                    `${item.dia}/${item.mes}/${item.ano}`, item.nCarta, item.estacion,
+                    item.hechoTipo, item.uso, item.calle, item.altura, item.despacho,
+                    item.presente, item.regreso, tResp, tPerm,
+                    victimas > 0 ? victimas : '', fallecidos > 0 ? fallecidos : '', item.causas,
+                ];
+            });
+
+            doc.autoTable({
+                head: [tableHeaders],
+                body: tableData,
+                startY: doc.lastAutoTable.finalY + 15,
+                theme: 'grid',
+                styles: {
+                    font: 'helvetica',
+                    textColor: primaryTextColor,
+                    fontSize: 7,
+                    cellPadding: 3,
+                    valign: 'middle',
+                    lineWidth: 0.5,
+                    lineColor: borderColor,
+                },
+                headStyles: {
+                    fillColor: headerFillColor,
+                    textColor: headerTextColor,
+                    fontStyle: 'bold',
+                    halign: 'center',
+                },
+                alternateRowStyles: { fillColor: alternateRowColor },
+                didParseCell: (data) => {
+                    // Center align specific columns
+                    if (data.section === 'body' && [0, 7, 8, 9, 10, 11, 12, 13].includes(data.column.index)) {
+                        data.cell.styles.halign = 'center';
+                    }
+                     // Highlight 'incendio' rows
+                    if (data.section === 'body' && data.row.raw && data.row.raw[3]) {
+                        const hechoTipoLower = String(data.row.raw[3]).toLowerCase();
+                        if (hechoTipoLower.includes('incendio') && hechoTipoLower !== 'alarma de incendio' && hechoTipoLower !== 'pedido de incendio') {
+                            data.cell.styles.fillColor = incendioFillColor;
+                            data.cell.styles.textColor = incendioTextColor;
+                            data.cell.styles.fontStyle = 'bold';
+                        }
+                    }
+                },
+                didDrawPage: (data) => {
+                    doc.setTextColor(secondaryTextColor);
+                    // Page Header (on every page)
+                    doc.setFontSize(10).setFont(undefined, 'normal');
+                    doc.text('Reporte de Intervenciones', data.settings.margin.left, 15);
+                    
+                    // Page Footer (on every page)
+                    const pageNum = doc.internal.getNumberOfPages();
+                    doc.setFontSize(8);
+                    doc.text(`Generado: ${new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`, data.settings.margin.left, pageH - 15);
+                    doc.text(`Página ${pageNum} de ${totalPagesExp}`, pageW - data.settings.margin.right, pageH - 15, { align: 'right' });
+                },
+                margin: { top: 60, bottom: 30 },
+            });
+
+            if (typeof doc.putTotalPages === 'function') {
+                doc.putTotalPages(totalPagesExp);
+            }
+
+            doc.save(`Reporte_Intervenciones_${new Date().toISOString().slice(0, 10)}.pdf`);
+        }
+
+        // =================================================================================
+        // ROUTER Y INICIALIZACIÓN
+        // =================================================================================
+
+        function handleNavigation() {
+            renderFooter();
+            const path = window.location.hash || '#/';
+            appContainer.innerHTML = ''; // Limpiar antes de renderizar
+
+            if (path === '#/settings') {
+                renderSettingsPage();
+            } else if (path === '#/statistics') {
+                renderStatisticsPage();
+            }
+            else {
+                renderHomePage();
+            }
+        }
+
+        // Iniciar la aplicación
+        window.addEventListener('hashchange', handleNavigation);
+        window.addEventListener('DOMContentLoaded', () => {
+            applyZoom();
+            handleNavigation();
+        });
+    </script>
+</body>
+</html>

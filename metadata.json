@@ -1,0 +1,6 @@
+{
+  "name": "Copy of Registro de Intervenciones de Bomberos  para app sheet",
+  "description": "Una aplicación para registrar y analizar intervenciones de bomberos, con la capacidad de ver estadísticas detalladas. Los datos se guardan localmente en su navegador.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
