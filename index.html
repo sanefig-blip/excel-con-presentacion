@@ -125,7 +125,7 @@
                 "217 IGNICION DE GASES/VAPORES CON LLAMA LIBRE", "218 FUGA EN SISTEMA DE GNC",
                 "219 IGNICION DE FUGA GNC/HC CON SISTEMA DE ENCENDIDO", "220 ASPERJAMIENTO DE SUSTANCIA ACELERANTE DE LA COMBUSTION",
                 "221 IGNICION DE MEMBRANA ASFALTICA", "222 BOLLOS DE PAPEL", "223 FUEGO EN ZONA DE MANIFESTANTES",
-                "224 CHISPAS DE CARBON EN CONTACTO CON GRASAS", "225 RECALENTAMIENTO DE BOBINADO", "226 EN ESTUDIO",
+                "224 CHISPAS DE CARBON EN CONTACTO COM GRASAS", "225 RECALENTAMIENTO DE BOBINADO", "226 EN ESTUDIO",
                 "227 OTROS", "227 OTROS (BRASAS)", "227 OTROS (CHISPAS SOLDADORA/OXICORTE)", "227 OTROS (CONDUCCION)",
                 "227 OTROS (FUMIGACION)", "227 OTROS (TRANSEUNTES)", "227 OTROS (GAS EVADIDO)",
                 "227 OTROS (GRASAS ADHERIDAS)", "227 OTROS (IGNICION DE ACEITE)", "227 OTROS (IGNICION DE GRASAS)",
@@ -1223,15 +1223,26 @@
                     };
 
                     const essentialFields = { dia: 'Día', mes: 'Mes', ano: 'Año', estacion: 'Estación', hechoTipo: 'Hecho/Tipo' };
+                    
                     const headerIndices = {};
-
+                    const reverseHeaderMapping = {};
+                    // Create a reverse map from every possible alias to the canonical field name
+                    // e.g., { 'día': 'dia', 'dia': 'dia', 'mes': 'mes', ... }
                     for (const field in headerMapping) {
-                        const possibleNames = headerMapping[field];
-                        const index = headers.findIndex(h => possibleNames.includes(h));
-                        if (index !== -1) {
-                            headerIndices[field] = index;
+                        for (const alias of headerMapping[field]) {
+                            reverseHeaderMapping[alias] = field;
                         }
                     }
+
+                    // Iterate through the actual headers from the Excel file
+                    // and map them to their canonical field using the index
+                    headers.forEach((header, index) => {
+                        const field = reverseHeaderMapping[header];
+                        // If a mapping is found and we haven't already found this field, store it
+                        if (field && headerIndices[field] === undefined) {
+                            headerIndices[field] = index;
+                        }
+                    });
 
                     for (const field in essentialFields) {
                         if (headerIndices[field] === undefined) {
