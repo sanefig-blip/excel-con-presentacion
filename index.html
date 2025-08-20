@@ -10,7 +10,6 @@
     <script src="https://unpkg.com/jspdf-autotable@3.5.28/dist/jspdf.plugin.autotable.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.bundle.js"></script>
     <style>
         /* Agrega un estilo para los scrollbars para que se vean mejor en temas oscuros */
         ::-webkit-scrollbar {
@@ -58,7 +57,6 @@
             settings: '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.096 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>',
             stats: '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>',
             drillDown: '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /><path fill-rule="evenodd" d="M8 10a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" /></svg>',
-            presentation: '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V7a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>',
         };
         
         // Register Chart.js plugins globally
@@ -897,7 +895,7 @@
                             ${createMultiSelect('filter-usos', 'Usos', editableLists.usos, dashboardFilters.usos)}
                         </div>
                         <div class="flex justify-end gap-3 pt-3 border-t border-gray-700">
-                             <button id="export-pptx-btn" class="flex items-center space-x-2 px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-500 transition-colors">${ICONS.presentation} <span>Generar Presentación</span></button>
+                             <button id="export-word-btn" class="flex items-center space-x-2 px-4 py-2 bg-blue-700 text-white rounded-md hover:bg-blue-600 transition-colors">${ICONS.download} <span>Generar Análisis (Word)</span></button>
                             <button id="reset-filters-btn" class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-500">Limpiar Filtros</button>
                             <button id="apply-filters-btn" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500">Aplicar Filtros</button>
                         </div>
@@ -1036,7 +1034,7 @@
         function attachStatisticsPageListeners() {
             const applyBtn = document.getElementById('apply-filters-btn');
             const resetBtn = document.getElementById('reset-filters-btn');
-            const pptxBtn = document.getElementById('export-pptx-btn');
+            const wordBtn = document.getElementById('export-word-btn');
 
             const getSelectedOptions = (selectId) => {
                 const select = document.getElementById(selectId);
@@ -1062,8 +1060,8 @@
                 });
             }
             
-            if (pptxBtn) {
-                pptxBtn.addEventListener('click', handleExportToPptx);
+            if (wordBtn) {
+                wordBtn.addEventListener('click', handleExportToWord);
             }
         }
 
@@ -1071,50 +1069,25 @@
         // LÓGICA DE EXPORTACIÓN / IMPORTACIÓN
         // =================================================================================
         
-        async function handleExportToPptx() {
-            const btn = document.getElementById('export-pptx-btn');
-            if (btn) btn.disabled = true;
+        async function handleExportToWord() {
+            const btn = document.getElementById('export-word-btn');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<span>Generando...</span>`;
+            }
             document.body.style.cursor = 'wait';
 
-            if (typeof window.PptxGenJS === 'undefined') {
-                console.error("PptxGenJS library not loaded.");
-                alert("Error: La librería para crear presentaciones no se cargó correctamente. Por favor, revise su conexión a internet y refresque la página.");
-                if (btn) btn.disabled = false;
-                document.body.style.cursor = 'default';
-                return;
-            }
-
             try {
-                const pptx = new window.PptxGenJS();
-
-                // --- Configuración de Diseño ---
-                pptx.defineLayout({ name: "LAYOUT_DARK", width: 13.33, height: 7.5 });
-                pptx.layout = "LAYOUT_DARK";
-
-                pptx.defineSlideMaster({
-                    title: "MASTER_SLIDE_DARK",
-                    background: { color: "1F2937" }, // bg-gray-800
-                    objects: [
-                        { text: {
-                            text: "Reporte de Intervenciones de Bomberos",
-                            options: { x: 0.5, y: 0.25, w: "93%", h: 0.5, align: "center", color: "FFFFFF", fontSize: 24, bold: true },
-                        }},
-                        { text: {
-                            text: `Generado: ${new Date().toLocaleDateString("es-ES")}`,
-                            options: { x: 0.5, y: 7.0, w: "45%", h: 0.25, align: "left", color: "A0AEC0", fontSize: 10 },
-                        }},
-                        { placeholder: {
-                            options: { name: "footer", type: "slideNumber", x: "90%", y: 7.0, w: 0.5, h: 0.25, align: "right", color: "A0AEC0", fontSize: 10 },
-                            text: "Número de Diapositiva",
-                        }}
-                    ],
-                });
-
-                // --- Diapositiva de Título ---
-                let slide = pptx.addSlide({ masterName: "MASTER_SLIDE_DARK" });
-                slide.addText("Análisis de Intervenciones", { x: 0.5, y: 2.0, w: "93%", h: 1.0, align: "center", fontSize: 48, color: "FFFFFF", bold: true });
-
+                const filteredInterventions = getFilteredInterventions();
+                const kpis = getDashboardKpis(filteredInterventions);
                 const { startDate, endDate } = state.dashboardFilters;
+
+                // 1. Get chart images as Base64
+                const hechosChartImg = window['hechos-chart']?.toBase64Image();
+                const estacionesChartImg = window['estaciones-chart']?.toBase64Image();
+                const tendenciaChartImg = window['tendencia-chart']?.toBase64Image();
+                
+                // 2. Build HTML content for the Word document
                 let dateRangeText = "Período: Todos los datos registrados";
                 if (startDate && endDate) {
                     dateRangeText = `Período: ${new Date(startDate + 'T00:00:00').toLocaleDateString("es-ES")} - ${new Date(endDate + 'T00:00:00').toLocaleDateString("es-ES")}`;
@@ -1123,52 +1096,117 @@
                 } else if (endDate) {
                     dateRangeText = `Período: Hasta ${new Date(endDate + 'T00:00:00').toLocaleDateString("es-ES")}`;
                 }
-                slide.addText(dateRangeText, { x: 0.5, y: 3.2, w: "93%", h: 0.5, align: "center", fontSize: 20, color: "E5E7EB" });
 
+                const tableHeaders = ['Fecha', 'Estación', 'Hecho/Tipo', 'Uso', 'Calle', 'Altura', 'T.Resp', 'T.Perm'];
+                const tableBody = filteredInterventions.map(item => {
+                    const tResp = calculateTimeDiff(item.despacho, item.presente);
+                    const tPerm = calculateTimeDiff(item.presente, item.regreso);
+                    return `
+                        <tr>
+                            ${[
+                                `${item.dia}/${item.mes}/${item.ano}`,
+                                item.estacion,
+                                item.hechoTipo,
+                                item.uso,
+                                item.calle,
+                                item.altura,
+                                tResp,
+                                tPerm
+                            ].map(val => `<td style="border: 1px solid #dddddd; padding: 8px;">${sanitizeHTML(val)}</td>`).join('')}
+                        </tr>
+                    `;
+                }).join('');
 
-                // --- Diapositiva de KPIs ---
-                const filteredInterventions = getFilteredInterventions();
-                const kpis = getDashboardKpis(filteredInterventions);
+                const htmlContent = `
+                    <!DOCTYPE html>
+                    <html lang="es">
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>Análisis de Intervenciones</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
+                            h1, h2 { border-bottom: 2px solid #eee; padding-bottom: 5px; }
+                            .chart-container { margin: 30px 0; text-align: center; page-break-inside: avoid; }
+                            .chart-container img { max-width: 95%; border: 1px solid #ccc; }
+                            table { border-collapse: collapse; width: 100%; margin-top: 20px; font-size: 10px; }
+                            th, td { border: 1px solid #dddddd; padding: 6px; text-align: left; }
+                            th { background-color: #f2f2f2; }
+                            tr:nth-child(even) { background-color: #f9f9f9; }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>Análisis de Intervenciones de Bomberos</h1>
+                        <h2>${dateRangeText}</h2>
+
+                        <h2>Indicadores Clave (KPIs)</h2>
+                        <table style="width: 100%; text-align: center; font-size: 12px;">
+                            <thead>
+                                <tr>
+                                    <th>Total Intervenciones</th>
+                                    <th>Víctimas / Fallecidos</th>
+                                    <th>T. Prom. Respuesta</th>
+                                    <th>T. Prom. Permanencia</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="font-size: 20px; font-weight: bold;">${kpis.total}</td>
+                                    <td style="font-size: 20px; font-weight: bold;">${kpis.victimasFallecidos}</td>
+                                    <td style="font-size: 20px; font-weight: bold;">${kpis.avgDespues}</td>
+                                    <td style="font-size: 20px; font-weight: bold;">${kpis.avgDuracion}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        ${hechosChartImg ? `
+                            <div class="chart-container">
+                                <h2>Intervenciones por Tipo de Hecho</h2>
+                                <img src="${hechosChartImg}" alt="Gráfico de Intervenciones por Tipo de Hecho">
+                            </div>` : ''
+                        }
+                        ${estacionesChartImg ? `
+                            <div class="chart-container">
+                                <h2>Distribución por Estación</h2>
+                                <img src="${estacionesChartImg}" alt="Gráfico de Distribución por Estación">
+                            </div>` : ''
+                        }
+                        ${tendenciaChartImg ? `
+                            <div class="chart-container">
+                                <h2>Tendencia de Intervenciones</h2>
+                                <img src="${tendenciaChartImg}" alt="Gráfico de Tendencia de Intervenciones">
+                            </div>` : ''
+                        }
+
+                        <h2>Detalle de Intervenciones Filtradas</h2>
+                        <table>
+                            <thead>
+                                <tr>${tableHeaders.map(h => `<th>${h}</th>`).join('')}</tr>
+                            </thead>
+                            <tbody>${tableBody}</tbody>
+                        </table>
+                    </body>
+                    </html>
+                `;
+
+                // 3. Create and download the file
+                const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `Analisis_Intervenciones_${new Date().toISOString().slice(0, 10)}.doc`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
                 
-                slide = pptx.addSlide({ masterName: "MASTER_SLIDE_DARK" });
-                slide.addText("Indicadores Clave de Rendimiento (KPIs)", { x: 0.5, y: 0.5, w: "93%", h: 0.75, align: 'left', fontSize: 32, color: "FFFFFF", bold: true });
-
-                const kpiBox = (x, y, title, value, valueColor) => {
-                    slide.addShape(pptx.shapes.RECTANGLE, { x, y, w: 5.9, h: 2.5, fill: { color: "2D3748" }, line: { color: "4A5568", width: 1 } });
-                    slide.addText(value, { x, y: y + 0.5, w: 5.9, h: 1.0, align: "center", fontSize: 36, bold: true, color: valueColor });
-                    slide.addText(title, { x, y: y + 1.5, w: 5.9, h: 0.5, align: "center", fontSize: 14, color: "D1D5DB" });
-                };
-                kpiBox(0.6, 1.5, 'Total Intervenciones', kpis.total.toString(), '3B82F6');
-                kpiBox(6.8, 1.5, 'Víctimas / Fallecidos', kpis.victimasFallecidos, 'FBBF24');
-                kpiBox(0.6, 4.2, 'T. Promedio Respuesta', kpis.avgDespues, '22D3EE');
-                kpiBox(6.8, 4.2, 'T. Promedio Permanencia', kpis.avgDuracion, 'F97316');
-
-                // --- Diapositivas de Gráficos ---
-                const addChartSlide = (title, chartId) => {
-                    const chartCanvas = document.getElementById(chartId);
-                    const chart = chartCanvas ? window[chartId] : null;
-
-                    if (chart && chartCanvas.height > 0) {
-                        const slide = pptx.addSlide({ masterName: "MASTER_SLIDE_DARK" });
-                        slide.addText(title, { x: 0.5, y: 0.5, w: "93%", h: 0.75, align: 'left', fontSize: 32, color: "FFFFFF", bold: true });
-                        const imgData = chart.toBase64Image();
-                        slide.addImage({ data: imgData, x: 1, y: 1.3, w: 11.33, h: 5.25 });
-                    } else {
-                        console.warn(`Chart with ID '${chartId}' not found or not rendered, skipping slide.`);
-                    }
-                }
-                addChartSlide("Intervenciones por Tipo de Hecho", "hechos-chart");
-                addChartSlide("Distribución de Intervenciones por Estación", "estaciones-chart");
-                addChartSlide("Tendencia Temporal de Intervenciones", "tendencia-chart");
-
-                // --- Descargar Archivo ---
-                await pptx.writeFile({ fileName: `Reporte_Intervenciones_${new Date().toISOString().slice(0, 10)}.pptx` });
-
-            } catch(err) {
-                console.error("Error generating presentation:", err);
-                alert("Ocurrió un error al generar la presentación. Por favor, revise la consola para más detalles.");
+            } catch (err) {
+                console.error("Error generating Word document:", err);
+                alert("Ocurrió un error al generar el documento. Por favor, revise la consola para más detalles.");
             } finally {
-                if (btn) btn.disabled = false;
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `${ICONS.download} <span>Generar Análisis (Word)</span>`;
+                }
                 document.body.style.cursor = 'default';
             }
         }
