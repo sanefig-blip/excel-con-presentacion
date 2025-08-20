@@ -1195,59 +1195,62 @@
                         throw new Error("El archivo Excel está vacío o no tiene datos.");
                     }
 
-                    const headers = jsonData[0].map(h => typeof h === 'string' ? h.trim().toLowerCase() : '');
+                    const headers = jsonData[0].map(h => typeof h === 'string' ? h.trim() : '');
                     const dataRows = jsonData.slice(1);
                     
-                    const headerMapping = {
-                        interv: ['interv'],
-                        dia: ['día', 'dia'],
-                        mes: ['mes'],
-                        ano: ['año', 'ano'],
-                        nCarta: ['n° carta', 'nro carta', 'n carta'],
-                        estacion: ['estación', 'estacion'],
-                        hechoTipo: ['hecho/tipo', 'hecho', 'tipo'],
-                        uso: ['uso'],
-                        plantaPiso: ['planta/piso', 'planta', 'piso'],
-                        despacho: ['despach', 'despacho'],
-                        presente: ['present', 'presente'],
-                        regreso: ['regres', 'regreso'],
-                        calle: ['calle'],
-                        altura: ['altura / inters.', 'altura', 'interseccion'],
-                        causas: ['causas'],
-                        cria: ['cria', 'cría'],
-                        juzg: ['juzg'],
-                        vm: ['vm'],
-                        vf: ['vf'],
-                        fm: ['fm'],
-                        ff: ['ff'],
+                    const columnMap = {
+                        interv: ['Interv'],
+                        dia: ['Día', 'Dia'],
+                        mes: ['Mes'],
+                        ano: ['Año', 'Ano'],
+                        nCarta: ['N° Carta', 'Nro Carta', 'N Carta'],
+                        estacion: ['Estación', 'Estacion'],
+                        hechoTipo: ['Hecho/Tipo', 'Hecho', 'Tipo'],
+                        uso: ['Uso'],
+                        plantaPiso: ['Planta/Piso', 'Planta', 'Piso'],
+                        despacho: ['Despach', 'Despacho'],
+                        presente: ['Present', 'Presente'],
+                        regreso: ['Regres', 'Regreso'],
+                        calle: ['Calle'],
+                        altura: ['Altura / Inters.', 'Altura', 'Interseccion'],
+                        causas: ['Causas'],
+                        cria: ['Cria', 'Cría'],
+                        juzg: ['Juzg'],
+                        vm: ['VM'],
+                        vf: ['VF'],
+                        fm: ['FM'],
+                        ff: ['FF'],
                     };
 
-                    const essentialFields = { dia: 'Día', mes: 'Mes', ano: 'Año', estacion: 'Estación', hechoTipo: 'Hecho/Tipo' };
+                    const essentialFields = { 
+                        dia: 'Día', 
+                        mes: 'Mes', 
+                        ano: 'Año', 
+                        estacion: 'Estación', 
+                        hechoTipo: 'Hecho/Tipo' 
+                    };
                     
+                    const stringsMatch = (a, b) => {
+                        if (typeof a !== 'string' || typeof b !== 'string') return false;
+                        const normalize = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+                        return normalize(a) === normalize(b);
+                    };
+
                     const headerIndices = {};
-                    const reverseHeaderMapping = {};
-                    // Create a reverse map from every possible alias to the canonical field name
-                    // e.g., { 'día': 'dia', 'dia': 'dia', 'mes': 'mes', ... }
-                    for (const field in headerMapping) {
-                        for (const alias of headerMapping[field]) {
-                            reverseHeaderMapping[alias] = field;
+                    for (const internalField in columnMap) {
+                        const possibleNames = columnMap[internalField];
+                        const headerIndex = headers.findIndex(excelHeader => 
+                            possibleNames.some(possibleName => stringsMatch(excelHeader, possibleName))
+                        );
+                        if (headerIndex !== -1) {
+                            headerIndices[internalField] = headerIndex;
                         }
                     }
-
-                    // Iterate through the actual headers from the Excel file
-                    // and map them to their canonical field using the index
-                    headers.forEach((header, index) => {
-                        const field = reverseHeaderMapping[header];
-                        // If a mapping is found and we haven't already found this field, store it
-                        if (field && headerIndices[field] === undefined) {
-                            headerIndices[field] = index;
-                        }
-                    });
 
                     for (const field in essentialFields) {
                         if (headerIndices[field] === undefined) {
                             const friendlyName = essentialFields[field];
-                            const possibleNames = headerMapping[field].join(', ');
+                            const possibleNames = columnMap[field].join(', ');
                             throw new Error(`El archivo Excel no tiene la columna requerida: "${friendlyName}".\nAsegúrese de que la columna exista y tenga un nombre como: ${possibleNames}.`);
                         }
                     }
