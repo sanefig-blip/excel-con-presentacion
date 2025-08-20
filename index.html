@@ -1195,29 +1195,51 @@
                         throw new Error("El archivo Excel está vacío o no tiene datos.");
                     }
 
-                    const headers = jsonData[0].map(h => typeof h === 'string' ? h.trim() : h);
+                    const headers = jsonData[0].map(h => typeof h === 'string' ? h.trim().toLowerCase() : '');
                     const dataRows = jsonData.slice(1);
                     
-                    const headerMap = {
-                        'Interv': 'interv', 'Día': 'dia', 'Mes': 'mes', 'Año': 'ano', 'N° Carta': 'nCarta', 'Estación': 'estacion', 'Hecho/Tipo': 'hechoTipo',
-                        'Uso': 'uso', 'Planta/Piso': 'plantaPiso', 'Despach': 'despacho', 'Present': 'presente', 'Regres': 'regreso', 'Calle': 'calle', 'Altura / Inters.': 'altura',
-                        'Causas': 'causas', 'Cria': 'cria', 'Juzg': 'juzg', 'VM': 'vm', 'VF': 'vf', 'FM': 'fm', 'FF': 'ff'
+                    const headerMapping = {
+                        interv: ['interv'],
+                        dia: ['día', 'dia'],
+                        mes: ['mes'],
+                        ano: ['año', 'ano'],
+                        nCarta: ['n° carta', 'nro carta', 'n carta'],
+                        estacion: ['estación', 'estacion'],
+                        hechoTipo: ['hecho/tipo', 'hecho', 'tipo'],
+                        uso: ['uso'],
+                        plantaPiso: ['planta/piso', 'planta', 'piso'],
+                        despacho: ['despach', 'despacho'],
+                        presente: ['present', 'presente'],
+                        regreso: ['regres', 'regreso'],
+                        calle: ['calle'],
+                        altura: ['altura / inters.', 'altura', 'interseccion'],
+                        causas: ['causas'],
+                        cria: ['cria', 'cría'],
+                        juzg: ['juzg'],
+                        vm: ['vm'],
+                        vf: ['vf'],
+                        fm: ['fm'],
+                        ff: ['ff'],
                     };
 
-                    const essentialHeaders = ['Día', 'Mes', 'Año', 'Estación', 'Hecho/Tipo'];
-                    for (const h of essentialHeaders) {
-                        if (!headers.includes(h)) {
-                            throw new Error(`El archivo Excel no tiene la columna requerida: "${h}". Por favor, use un archivo con el formato correcto.`);
+                    const essentialFields = { dia: 'Día', mes: 'Mes', ano: 'Año', estacion: 'Estación', hechoTipo: 'Hecho/Tipo' };
+                    const headerIndices = {};
+
+                    for (const field in headerMapping) {
+                        const possibleNames = headerMapping[field];
+                        const index = headers.findIndex(h => possibleNames.includes(h));
+                        if (index !== -1) {
+                            headerIndices[field] = index;
                         }
                     }
-                    
-                    const headerIndices = {};
-                    Object.keys(headerMap).forEach(key => {
-                        const index = headers.indexOf(key);
-                        if (index !== -1) {
-                            headerIndices[headerMap[key]] = index;
+
+                    for (const field in essentialFields) {
+                        if (headerIndices[field] === undefined) {
+                            const friendlyName = essentialFields[field];
+                            const possibleNames = headerMapping[field].join(', ');
+                            throw new Error(`El archivo Excel no tiene la columna requerida: "${friendlyName}".\nAsegúrese de que la columna exista y tenga un nombre como: ${possibleNames}.`);
                         }
-                    });
+                    }
 
                     const newInterventions = dataRows.map(row => {
                         if (row.length === 0 || row.every(cell => cell === null || cell === '')) return null;
@@ -1227,14 +1249,17 @@
                             const index = headerIndices[key];
                             let value = row[index];
 
-                            if ((key === 'despacho' || key === 'presente' || key === 'regreso') && value instanceof Date) {
-                                const excelTime = value.getTime() - new Date(Date.UTC(1899, 11, 30)).getTime();
-                                if (excelTime > 0) {
-                                    const hours = Math.floor((excelTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                                    const minutes = Math.floor((excelTime % (1000 * 60 * 60)) / (1000 * 60));
+                            if ((key === 'despacho' || key === 'presente' || key === 'regreso')) {
+                                if (value instanceof Date) {
+                                    const hours = value.getUTCHours();
+                                    const minutes = value.getUTCMinutes();
                                     value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-                                } else {
-                                     value = '00:00';
+                                } else if (typeof value === 'number' && value < 1 && value > 0) {
+                                    // Handle Excel time as a number (fraction of a day)
+                                    const totalSeconds = Math.round(value * 86400);
+                                    const hours = Math.floor(totalSeconds / 3600);
+                                    const minutes = Math.floor((totalSeconds % 3600) / 60);
+                                    value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
                                 }
                             }
                             intervention[key] = value !== undefined && value !== null ? String(value) : '';
@@ -1254,6 +1279,7 @@
 
                         return intervention;
                     }).filter(Boolean);
+
 
                     if (newInterventions.length > 0) {
                         const updatedInterventions = [...state.interventions, ...newInterventions];
