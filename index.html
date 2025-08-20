@@ -628,13 +628,11 @@
                 <div class="space-y-4">
                     ${renderAppHeader(headerData)}
                     <div class="flex flex-wrap justify-end gap-3">
-                        <button id="import-excel-btn" class="flex items-center space-x-2 bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">${ICONS.upload}<span>Importar Excel</span></button>
                         <button id="export-excel-btn" class="flex items-center space-x-2 bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">${ICONS.download}<span>Descargar Excel</span></button>
                         <button id="export-pdf-btn" class="flex items-center space-x-2 bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">${ICONS.download}<span>Descargar PDF</span></button>
                         <button id="edit-header-btn" class="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">${ICONS.edit()}<span>Editar Encabezado</span></button>
                         <button id="add-intervention-btn" class="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">${ICONS.plus}<span>Agregar Intervención</span></button>
                     </div>
-                    <input type="file" id="excel-file-input" class="hidden" accept=".xlsx, .xls">
                     ${interventions.length > 0 ? `
                         <div class="overflow-x-auto rounded-lg shadow-lg">
                             <table class="min-w-full divide-y divide-gray-600 font-mono text-xs">
@@ -939,9 +937,6 @@
             document.getElementById('add-intervention-btn').addEventListener('click', () => renderInterventionForm());
             document.getElementById('edit-header-btn').addEventListener('click', renderHeaderForm);
             
-            document.getElementById('import-excel-btn').addEventListener('click', () => document.getElementById('excel-file-input').click());
-            document.getElementById('excel-file-input').addEventListener('change', handleImportFromExcel);
-
             document.getElementById('export-excel-btn').addEventListener('click', handleExportToExcel);
             const pdfBtn = document.getElementById('export-pdf-btn');
             if (pdfBtn) {
@@ -1178,204 +1173,67 @@
             }
         }
         
-        function handleImportFromExcel(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-                    const sheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[sheetName];
-                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                    
-                    if (jsonData.length < 2) {
-                        throw new Error("El archivo Excel está vacío o no tiene datos.");
-                    }
-
-                    const headers = jsonData[0].map(h => typeof h === 'string' ? h.trim() : '');
-                    const dataRows = jsonData.slice(1);
-                    
-                    const columnMap = {
-                        interv: ['Interv'],
-                        dia: ['Día', 'Dia'],
-                        mes: ['Mes'],
-                        ano: ['Año', 'Ano'],
-                        nCarta: ['N° Carta', 'Nro Carta', 'N Carta'],
-                        estacion: ['Estación', 'Estacion'],
-                        hechoTipo: ['Hecho/Tipo', 'Hecho', 'Tipo'],
-                        uso: ['Uso'],
-                        plantaPiso: ['Planta/Piso', 'Planta', 'Piso'],
-                        despacho: ['Despach', 'Despacho'],
-                        presente: ['Present', 'Presente'],
-                        regreso: ['Regres', 'Regreso'],
-                        calle: ['Calle'],
-                        altura: ['Altura / Inters.', 'Altura', 'Interseccion'],
-                        causas: ['Causas'],
-                        cria: ['Cria', 'Cría'],
-                        juzg: ['Juzg'],
-                        vm: ['VM'],
-                        vf: ['VF'],
-                        fm: ['FM'],
-                        ff: ['FF'],
-                    };
-
-                    const essentialFields = { 
-                        dia: 'Día', 
-                        mes: 'Mes', 
-                        ano: 'Año', 
-                        estacion: 'Estación', 
-                        hechoTipo: 'Hecho/Tipo' 
-                    };
-                    
-                    const stringsMatch = (a, b) => {
-                        if (typeof a !== 'string' || typeof b !== 'string') return false;
-                        const normalize = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-                        return normalize(a) === normalize(b);
-                    };
-
-                    const headerIndices = {};
-                    for (const internalField in columnMap) {
-                        const possibleNames = columnMap[internalField];
-                        const headerIndex = headers.findIndex(excelHeader => 
-                            possibleNames.some(possibleName => stringsMatch(excelHeader, possibleName))
-                        );
-                        if (headerIndex !== -1) {
-                            headerIndices[internalField] = headerIndex;
-                        }
-                    }
-
-                    for (const field in essentialFields) {
-                        if (headerIndices[field] === undefined) {
-                            const friendlyName = essentialFields[field];
-                            const possibleNames = columnMap[field].join(', ');
-                            throw new Error(`El archivo Excel no tiene la columna requerida: "${friendlyName}".\nAsegúrese de que la columna exista y tenga un nombre como: ${possibleNames}.`);
-                        }
-                    }
-
-                    const newInterventions = dataRows.map(row => {
-                        if (row.length === 0 || row.every(cell => cell === null || cell === '')) return null;
-
-                        const intervention = {};
-                        for (const key in headerIndices) {
-                            const index = headerIndices[key];
-                            let value = row[index];
-
-                            if ((key === 'despacho' || key === 'presente' || key === 'regreso')) {
-                                if (value instanceof Date) {
-                                    const hours = value.getUTCHours();
-                                    const minutes = value.getUTCMinutes();
-                                    value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-                                } else if (typeof value === 'number' && value < 1 && value > 0) {
-                                    // Handle Excel time as a number (fraction of a day)
-                                    const totalSeconds = Math.round(value * 86400);
-                                    const hours = Math.floor(totalSeconds / 3600);
-                                    const minutes = Math.floor((totalSeconds % 3600) / 60);
-                                    value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-                                }
-                            }
-                            intervention[key] = value !== undefined && value !== null ? String(value) : '';
-                        }
-
-                        const numberFields = ['vm', 'vf', 'fm', 'ff', 'dia', 'mes', 'ano'];
-                        numberFields.forEach(field => {
-                            intervention[field] = parseInt(intervention[field], 10) || (field.startsWith('v') || field.startsWith('f') ? 0 : '');
-                        });
-                        
-                        intervention.id = crypto.randomUUID();
-
-                        if (!intervention.ano || !intervention.mes || !intervention.dia) {
-                            console.warn('Fila omitida por falta de fecha:', row);
-                            return null;
-                        }
-
-                        return intervention;
-                    }).filter(Boolean);
-
-
-                    if (newInterventions.length > 0) {
-                        const updatedInterventions = [...state.interventions, ...newInterventions];
-                        setState({ interventions: updatedInterventions });
-                        alert(`${newInterventions.length} registro(s) importado(s) exitosamente.`);
-                    } else {
-                        alert("No se encontraron nuevos registros para importar en el archivo.");
-                    }
-
-                } catch (error) {
-                    console.error("Error al importar el archivo Excel:", error);
-                    alert("Error al importar el archivo: " + error.message);
-                } finally {
-                    event.target.value = '';
-                }
-            };
-            reader.onerror = (error) => {
-                console.error("Error al leer el archivo:", error);
-                alert("Ocurrió un error al leer el archivo.");
-            };
-            reader.readAsArrayBuffer(file);
-        }
-
         function handleExportToExcel() {
             const { headerData, interventions } = state;
             const wb = XLSX.utils.book_new();
             const sheetData = [];
 
-            // --- 1. Definir Estilos ---
-            const borderAll = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+            // --- 1. Definir Estilos (tema claro para coincidir con el PDF) ---
+            const thinBorder = { style: "thin", color: { rgb: "D1D5DB" } };
+            const borderAll = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
             
             const titleStyle = { font: { bold: true, sz: 14 }, alignment: { horizontal: "center", vertical: "center" } };
-            const mainHeaderStyle = { font: { bold: true }, border: borderAll };
-            const tableHeaderStyle = { font: { bold: true, color: {rgb: "FFFFFF"}}, fill: { fgColor: { rgb: "4A5568" } }, border: borderAll, alignment: { horizontal: "center", vertical: "center", wrapText: true } };
+            const subtitleStyle = { font: { sz: 12 }, alignment: { horizontal: "center", vertical: "center" } };
+            const mainHeaderLabelStyle = { font: { bold: true } };
             
-            const defaultCellStyle = { border: borderAll };
-            const zebraStyle = { fill: { fgColor: { rgb: "2D3748" } }, border: borderAll }; // bg-gray-700
+            const tableHeaderStyle = { font: { bold: true, color: {rgb: "111827"}}, fill: { fgColor: { rgb: "F3F4F6" } }, border: borderAll, alignment: { horizontal: "center", vertical: "center", wrapText: true } };
             
-            const rightAlignStyle = { border: borderAll, alignment: { horizontal: "right" } };
-            const zebraRightAlignStyle = { fill: { fgColor: { rgb: "2D3748" } }, border: borderAll, alignment: { horizontal: "right" } }; // bg-gray-700
+            const defaultCellStyle = { border: borderAll, alignment: { vertical: "center" } };
+            const zebraStyle = { ...defaultCellStyle, fill: { fgColor: { rgb: "F9FAFB" } } };
+            const centerAlignStyle = { ...defaultCellStyle, alignment: { ...defaultCellStyle.alignment, horizontal: "center" }};
+            const zebraCenterAlignStyle = { ...zebraStyle, alignment: { ...zebraStyle.alignment, horizontal: "center" }};
             
-            const incendioStyle = { font: { color: { rgb: "FFFFFF" }, bold: true }, fill: { fgColor: { rgb: "C53030" } }, border: borderAll }; // bg-red-600
-            const incendioRightAlignStyle = { ...incendioStyle, alignment: { horizontal: "right" } };
+            const incendioStyle = { font: { color: { rgb: "991B1B" }, bold: true }, fill: { fgColor: { rgb: "FEE2E2" } }, border: borderAll, alignment: { vertical: "center" } };
+            const incendioCenterStyle = { ...incendioStyle, alignment: { ...incendioStyle.alignment, horizontal: "center" } };
             
-            // --- 2. Construir Encabezado en un Array (sheetData) ---
+            // --- 2. Construir Encabezado ---
+            const NUM_COLS = 15;
             sheetData.push(['OFICINA COMANDO OPERATIVO DE BOMBEROS']);
             sheetData.push([headerData.novedades]);
             sheetData.push([]); // Fila vacía
 
             const jefeOficialRows = [
-                { jK: 'jefeInspecciones', jL: 'JEFE DE INSPECCIONES', oK: 'oficialServicio1', oL: 'OFICIAL DE SERVICIO', oT: '08 a 20 hs'},
-                { jK: 'jefeServicio', jL: 'JEFE DE SERVICIO', oK: 'oficialGuardia1', oL: 'OFICIAL DE GUARDIA', oT: '08 a 20 hs'},
-                { jK: 'jefeGuardia', jL: 'JEFE DE GUARDIA', oK: 'oficialServicio2', oL: 'OFICIAL DE SERVICIO', oT: '20 a 08 hs'},
-                { jK: 'jefeReserva', jL: 'JEFE DE RESERVA', oK: 'oficialGuardia2', oL: 'OFICIAL DE GUARDIA', oT: '20 a 08 hs'},
+                { jK: 'jefeInspecciones', jL: 'JEFE DE INSPECCIONES:', oK: 'oficialServicio1', oL: 'OFICIAL DE SERVICIO 08 a 20 hs:'},
+                { jK: 'jefeServicio', jL: 'JEFE DE SERVICIO:', oK: 'oficialGuardia1', oL: 'OFICIAL DE GUARDIA 08 a 20 hs:'},
+                { jK: 'jefeGuardia', jL: 'JEFE DE GUARDIA:', oK: 'oficialServicio2', oL: 'OFICIAL DE SERVICIO 20 a 08 hs:'},
+                { jK: 'jefeReserva', jL: 'JEFE DE RESERVA:', oK: 'oficialGuardia2', oL: 'OFICIAL DE GUARDIA 20 a 08 hs:'},
             ];
+            
             jefeOficialRows.forEach(row => {
                 const jefe = headerData[row.jK];
                 const oficial = headerData[row.oK];
-                const excelRow = Array(23).fill(null);
+                const excelRow = Array(NUM_COLS).fill(null);
                 excelRow[0] = row.jL;
                 excelRow[1] = `${jefe.rank}: ${jefe.name}`;
                 excelRow[8] = row.oL;
-                excelRow[10] = row.oT;
-                excelRow[12] = oficial.rank;
-                excelRow[14] = oficial.name;
+                excelRow[9] = `${oficial.rank} ${oficial.name}`;
                 sheetData.push(excelRow);
             });
             
-            const confeccionoRow1 = Array(23).fill(null);
-            confeccionoRow1[0] = `Confeccionó ${headerData.confecciono1.time}`;
+            const confeccionoRow1 = Array(NUM_COLS).fill(null);
+            confeccionoRow1[0] = `Confeccionó ${headerData.confecciono1.time}:`;
             confeccionoRow1[1] = `${headerData.confecciono1.rank} ${headerData.confecciono1.name}`;
             sheetData.push(confeccionoRow1);
 
-            const confeccionoRow2 = Array(23).fill(null);
-            confeccionoRow2[0] = `Confeccionó ${headerData.confecciono2.time}`;
+            const confeccionoRow2 = Array(NUM_COLS).fill(null);
+            confeccionoRow2[0] = `Confeccionó ${headerData.confecciono2.time}:`;
             confeccionoRow2[1] = `${headerData.confecciono2.rank} ${headerData.confecciono2.name}`;
             sheetData.push(confeccionoRow2);
             
             sheetData.push([]); // Fila vacía
             
             const headerRowCount = sheetData.length;
-            const tableHeaders = ['Interv', 'Día', 'Mes', 'Año', 'N° Carta', 'Estación', 'Hecho/Tipo', 'Uso', 'Planta/Piso', 'Despach', 'Present', 'Despues', 'Regres', 'Duracion', 'Calle', 'Altura / Inters.', 'Causas', 'Cria', 'Juzg', 'VM', 'VF', 'FM', 'FF'];
+            const tableHeaders = ['Fecha', 'N° Carta', 'Estación', 'Hecho/Tipo', 'Uso', 'Calle', 'Altura', 'Despacho', 'Llegada', 'Regreso', 'T.Resp', 'T.Perm', 'Víctimas', 'Fallecidos', 'Causas'];
             sheetData.push(tableHeaders);
             
             // --- 3. Construir Filas de Datos ---
@@ -1388,78 +1246,84 @@
             });
 
             sortedInterventions.forEach(item => {
-                const despues = calculateTimeDiff(item.despacho, item.presente);
-                const duracion = calculateTimeDiff(item.presente, item.regreso);
+                const tResp = calculateTimeDiff(item.despacho, item.presente);
+                const tPerm = calculateTimeDiff(item.presente, item.regreso);
+                const victimas = (Number(item.vm) || 0) + (Number(item.vf) || 0);
+                const fallecidos = (Number(item.fm) || 0) + (Number(item.ff) || 0);
                 sheetData.push([
-                    item.interv, Number(item.dia), Number(item.mes), Number(item.ano), item.nCarta, item.estacion, item.hechoTipo,
-                    item.uso, item.plantaPiso, item.despacho, item.presente, despues, item.regreso,
-                    duracion, item.calle, item.altura, item.causas, item.cria, item.juzg,
-                    Number(item.vm), Number(item.vf), Number(item.fm), Number(item.ff)
+                    `${item.dia}/${item.mes}/${item.ano}`, item.nCarta, item.estacion, item.hechoTipo,
+                    item.uso, item.calle, item.altura, item.despacho, item.presente, item.regreso,
+                    tResp, tPerm, victimas > 0 ? victimas : '', fallecidos > 0 ? fallecidos : '', item.causas
                 ]);
             });
 
-            // --- 4. Crear Hoja y Aplicar Estilos, etc. ---
+            // --- 4. Crear Hoja y Aplicar Estilos ---
             const ws = XLSX.utils.aoa_to_sheet(sheetData);
 
-            // Aplicar estilos
-            for (let R = 0; R < sheetData.length; R++) {
-                for (let C = 0; C < sheetData[R].length; C++) {
-                    const cell_address = { c: C, r: R };
-                    const ref = XLSX.utils.encode_cell(cell_address);
+            ws['A1'].s = titleStyle;
+            ws['A2'].s = subtitleStyle;
+            
+            jefeOficialRows.forEach((_, index) => {
+                const R = 3 + index;
+                ws[XLSX.utils.encode_cell({c: 0, r: R})].s = mainHeaderLabelStyle;
+                ws[XLSX.utils.encode_cell({c: 8, r: R})].s = mainHeaderLabelStyle;
+            });
+            ws[XLSX.utils.encode_cell({c: 0, r: 7})].s = mainHeaderLabelStyle;
+            ws[XLSX.utils.encode_cell({c: 0, r: 8})].s = mainHeaderLabelStyle;
+
+            for (let C = 0; C < NUM_COLS; C++) {
+                const ref = XLSX.utils.encode_cell({c: C, r: headerRowCount});
+                if(ws[ref]) ws[ref].s = tableHeaderStyle;
+            }
+
+            for (let R = headerRowCount + 1; R < sheetData.length; R++) {
+                const isZebra = (R - (headerRowCount + 1)) % 2 !== 0;
+                const item = sortedInterventions[R - (headerRowCount + 1)];
+                const hechoTipoLower = item ? (item.hechoTipo || '').toLowerCase() : '';
+                const isIncendio = hechoTipoLower.includes('incendio') && hechoTipoLower !== 'alarma de incendio' && hechoTipoLower !== 'pedido de incendio';
+                
+                for (let C = 0; C < NUM_COLS; C++) {
+                    const ref = XLSX.utils.encode_cell({ c: C, r: R });
                     if (!ws[ref]) continue;
 
-                    if (R < headerRowCount) { // Estilos del encabezado
-                        if (R <= 1) ws[ref].s = titleStyle;
-                        else if (R >= 3 && R <= 8) { // Jefes/Oficiales y Confecciono
-                           ws[ref].s = {font: { bold: true } };
-                        }
-                    } else if (R === headerRowCount) { // Estilos de la cabecera de la tabla
-                        ws[ref].s = tableHeaderStyle;
-                    } else { // Estilos de los datos
-                        const isZebra = (R - headerRowCount) % 2 === 0;
-                        const item = sortedInterventions[R - (headerRowCount + 1)];
-                        const hechoTipoLower = item ? (item.hechoTipo || '').toLowerCase() : '';
-                        const isIncendio = hechoTipoLower.includes('incendio') && hechoTipoLower !== 'alarma de incendio' && hechoTipoLower !== 'pedido de incendio';
-                        const isNumberCol = (C >= 1 && C <= 3) || C >= 19;
+                    const isCenterAlignedCol = [0, 7, 8, 9, 10, 11, 12, 13].includes(C);
 
-                        if (isIncendio) {
-                            ws[ref].s = isNumberCol ? incendioRightAlignStyle : incendioStyle;
-                        } else if (isZebra) {
-                            ws[ref].s = isNumberCol ? zebraRightAlignStyle : zebraStyle;
-                        } else {
-                            ws[ref].s = isNumberCol ? rightAlignStyle : defaultCellStyle;
-                        }
+                    if (isIncendio) {
+                        ws[ref].s = isCenterAlignedCol ? incendioCenterStyle : incendioStyle;
+                    } else if (isZebra) {
+                        ws[ref].s = isCenterAlignedCol ? zebraCenterAlignStyle : zebraStyle;
+                    } else {
+                        ws[ref].s = isCenterAlignedCol ? centerAlignStyle : defaultCellStyle;
                     }
                 }
             }
-
-            // Aplicar combinaciones
+            
+            // --- 5. Combinaciones y Anchos ---
             ws['!merges'] = [
-                { s: { r: 0, c: 0 }, e: { r: 0, c: 22 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 22 } },
-                { s: { r: 3, c: 1 }, e: { r: 3, c: 7 } }, { s: { r: 3, c: 14 }, e: { r: 3, c: 22 } },
-                { s: { r: 4, c: 1 }, e: { r: 4, c: 7 } }, { s: { r: 4, c: 14 }, e: { r: 4, c: 22 } },
-                { s: { r: 5, c: 1 }, e: { r: 5, c: 7 } }, { s: { r: 5, c: 14 }, e: { r: 5, c: 22 } },
-                { s: { r: 6, c: 1 }, e: { r: 6, c: 7 } }, { s: { r: 6, c: 14 }, e: { r: 6, c: 22 } },
-                { s: { r: 7, c: 1 }, e: { r: 7, c: 22 } },
-                { s: { r: 8, c: 1 }, e: { r: 8, c: 22 } },
+                { s: { r: 0, c: 0 }, e: { r: 0, c: NUM_COLS - 1 } }, 
+                { s: { r: 1, c: 0 }, e: { r: 1, c: NUM_COLS - 1 } },
+                { s: { r: 3, c: 1 }, e: { r: 3, c: 6 } }, { s: { r: 3, c: 9 }, e: { r: 3, c: NUM_COLS - 1 } },
+                { s: { r: 4, c: 1 }, e: { r: 4, c: 6 } }, { s: { r: 4, c: 9 }, e: { r: 4, c: NUM_COLS - 1 } },
+                { s: { r: 5, c: 1 }, e: { r: 5, c: 6 } }, { s: { r: 5, c: 9 }, e: { r: 5, c: NUM_COLS - 1 } },
+                { s: { r: 6, c: 1 }, e: { r: 6, c: 6 } }, { s: { r: 6, c: 9 }, e: { r: 6, c: NUM_COLS - 1 } },
+                { s: { r: 7, c: 1 }, e: { r: 7, c: NUM_COLS - 1 } },
+                { s: { r: 8, c: 1 }, e: { r: 8, c: NUM_COLS - 1 } },
             ];
 
-            // Aplicar anchos de columna
             ws['!cols'] = [
-                { wch: 8 }, { wch: 4 }, { wch: 4 }, { wch: 5 }, { wch: 10 }, { wch: 35 },
-                { wch: 35 }, { wch: 35 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
-                { wch: 10 }, { wch: 10 }, { wch: 25 }, { wch: 15 }, { wch: 20 },
-                { wch: 6 }, { wch: 6 }, { wch: 4 }, { wch: 4 }, { wch: 4 }, { wch: 4 }
+                { wch: 10 }, { wch: 10 }, { wch: 30 }, { wch: 25 }, { wch: 25 },
+                { wch: 25 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
+                { wch: 10 }, { wch: 10 }, { wch: 8 },  { wch: 10 }, { wch: 15 }
             ];
             
-            // Aplicar Paneles Inmovilizados y AutoFiltro
+            // --- 6. Paneles Inmovilizados y AutoFiltro ---
             const freezeRow = headerRowCount + 1;
             ws['!views'] = [{ state: 'frozen', ySplit: freezeRow }];
             const autoFilterRange = XLSX.utils.encode_range({ s: { c: 0, r: headerRowCount }, e: { c: tableHeaders.length - 1, r: sheetData.length -1 } });
             ws['!autofilter'] = { ref: autoFilterRange };
 
             XLSX.utils.book_append_sheet(wb, ws, 'Hoja1');
-            XLSX.writeFile(wb, `intervenciones_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            XLSX.writeFile(wb, `Reporte_Intervenciones_${new Date().toISOString().slice(0, 10)}.xlsx`);
         }
 
         function handleExportToPdf() {
